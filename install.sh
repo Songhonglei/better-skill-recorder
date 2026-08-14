@@ -454,6 +454,10 @@ write_macos_app() {
       '  <string>10.15</string>' \
       '  <key>NSHighResolutionCapable</key>' \
       '  <true/>' \
+      '  <key>NSMicrophoneUsageDescription</key>' \
+      '  <string>Better Skill Recorder uses your microphone only while Narrate is enabled.</string>' \
+      '  <key>NSAudioCaptureUsageDescription</key>' \
+      '  <string>Better Skill Recorder uses the macOS screen-capture framework to record on-screen work. System audio is not recorded.</string>' \
       '</dict>' \
       '</plist>'
   } > "$plist_temporary"

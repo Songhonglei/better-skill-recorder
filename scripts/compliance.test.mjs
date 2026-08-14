@@ -656,6 +656,17 @@ test("only supported release targets are packaged", () => {
   assert.equal(repoManifest.build.win.target, "nsis");
 });
 
+test("macOS packages declare desktop capture privacy usage", () => {
+  assert.match(
+    repoManifest.build.mac.extendInfo.NSAudioCaptureUsageDescription,
+    /screen-capture framework/,
+  );
+  assert.match(
+    repoManifest.build.mac.extendInfo.NSMicrophoneUsageDescription,
+    /Narrate/,
+  );
+});
+
 test("the lockfile is registry-portable and install scripts are reviewed", async () => {
   assert.doesNotThrow(() => assertPortableLockfileRegistries(repoLock));
   assert.doesNotThrow(() => assertReviewedInstallScripts(repoLock, repoManifest));

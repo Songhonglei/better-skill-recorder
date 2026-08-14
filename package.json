@@ -136,7 +136,8 @@
       "hardenedRuntime": false,
       "category": "public.app-category.developer-tools",
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "Better Skill Recorder uses your microphone only while you turn on Narrate during a recording, to transcribe your spoken narration on this computer."
+        "NSMicrophoneUsageDescription": "Better Skill Recorder uses your microphone only while you turn on Narrate during a recording, to transcribe your spoken narration on this computer.",
+        "NSAudioCaptureUsageDescription": "Better Skill Recorder uses the macOS screen-capture framework to record on-screen work. System audio is not recorded."
       }
     },
     "win": {
