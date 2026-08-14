@@ -1,0 +1,34 @@
+[
+  {
+    "id": "qwen3.7-plus",
+    "label": "Qwen 3.7 Plus",
+    "badge": "Q",
+    "source": "Alibaba Cloud Token Plan",
+    "verified": true,
+    "capabilities": ["vision", "function-calling", "multi-turn-tools"]
+  },
+  {
+    "id": "qwen3.8-max",
+    "label": "Qwen 3.8 Max",
+    "badge": "Q",
+    "source": "Alibaba Cloud Token Plan",
+    "verified": true,
+    "capabilities": ["vision", "function-calling", "multi-turn-tools"]
+  },
+  {
+    "id": "kimi-k2.5",
+    "label": "Kimi K2.5",
+    "badge": "K",
+    "source": "Alibaba Cloud Token Plan",
+    "verified": true,
+    "capabilities": ["vision", "function-calling", "multi-turn-tools"]
+  },
+  {
+    "id": "kimi-k2.6",
+    "label": "Kimi K2.6",
+    "badge": "K",
+    "source": "Alibaba Cloud Token Plan",
+    "verified": true,
+    "capabilities": ["vision", "function-calling", "multi-turn-tools"]
+  }
+]

@@ -10,8 +10,10 @@ import {
 import path from "node:path";
 
 import { z } from "zod";
+import defaultModelPresetsJson from "../../common/model-presets.defaults.json" with { type: "json" };
 
 import type {
+  AgentModelPreset,
   AgentProviderConfigFile,
   AgentProviderSettings,
   AgentProviderSettingsInput,
@@ -25,6 +27,19 @@ import {
 const MAX_CONFIG_BYTES = 64 * 1024;
 const SECRET_VERSION = 1;
 
+const ModelPresetSchema = z.object({
+  id: z.string().trim().min(1).max(256),
+  label: z.string().trim().min(1).max(128),
+  badge: z.string().trim().min(1).max(3).optional(),
+  source: z.string().trim().min(1).max(128).optional(),
+  verified: z.boolean().optional(),
+  capabilities: z.array(z.string().trim().min(1).max(64)).max(16).optional(),
+}).strict();
+
+const DEFAULT_MODEL_PRESETS = z.array(ModelPresetSchema).max(100).parse(
+  defaultModelPresetsJson,
+) as AgentModelPreset[];
+
 const ConfigSchema = z.object({
   version: z.literal(1),
   provider: z.enum(["copilot", "openai-compatible"]),
@@ -32,6 +47,8 @@ const ConfigSchema = z.object({
     baseUrl: z.string().max(2048),
     model: z.string().max(256),
     vision: z.boolean(),
+    // Optional only for backward compatibility; reload migrates old files.
+    modelPresets: z.array(ModelPresetSchema).max(100).optional(),
     apiKeyEnv: z.string().trim().min(1).max(128).optional(),
   }).strict(),
 }).strict();
@@ -48,6 +65,7 @@ const DEFAULT_CONFIG: AgentProviderConfigFile = {
     baseUrl: "",
     model: "",
     vision: true,
+    modelPresets: DEFAULT_MODEL_PRESETS,
   },
 };
 
@@ -81,6 +99,8 @@ export interface AgentSettingsStoreOptions {
   configPath: string;
   secretPath: string;
   codec: SecretCodec;
+  /** Known platform capability, used to avoid probing native credentials at startup. */
+  secureStorageAvailable?: boolean;
   env?: NodeJS.ProcessEnv;
 }
 
@@ -113,7 +133,10 @@ function parseVision(raw: string | undefined, fallback: boolean): boolean {
   throw new Error(`${OPENAI_COMPATIBLE_ENV.vision} must be true or false.`);
 }
 
-function validateInput(input: AgentProviderSettingsInput): AgentProviderConfigFile {
+function validateInput(
+  input: AgentProviderSettingsInput,
+  modelPresets: AgentModelPreset[],
+): AgentProviderConfigFile {
   if (
     !input ||
     typeof input !== "object" ||
@@ -138,6 +161,7 @@ function validateInput(input: AgentProviderSettingsInput): AgentProviderConfigFi
       baseUrl: input.baseUrl.trim(),
       model: input.model.trim(),
       vision: input.vision,
+      modelPresets,
     },
   };
   if (config.provider === "openai-compatible") {
@@ -168,6 +192,7 @@ export class AgentSettingsStore {
     this.configError = undefined;
     if (!existsSync(this.options.configPath)) {
       this.fileConfig = DEFAULT_CONFIG;
+      atomicWrite(this.options.configPath, `${JSON.stringify(DEFAULT_CONFIG, null, 2)}\n`);
       return this.snapshot();
     }
     const previous = this.fileConfig;
@@ -176,7 +201,18 @@ export class AgentSettingsStore {
       if (Buffer.byteLength(raw) > MAX_CONFIG_BYTES) {
         throw new Error("Provider configuration is too large.");
       }
-      this.fileConfig = ConfigSchema.parse(JSON.parse(raw));
+      const parsed = ConfigSchema.parse(JSON.parse(raw));
+      const needsPresetMigration = parsed.openaiCompatible.modelPresets === undefined;
+      this.fileConfig = {
+        ...parsed,
+        openaiCompatible: {
+          ...parsed.openaiCompatible,
+          modelPresets: parsed.openaiCompatible.modelPresets ?? DEFAULT_MODEL_PRESETS,
+        },
+      };
+      if (needsPresetMigration) {
+        atomicWrite(this.options.configPath, `${JSON.stringify(this.fileConfig, null, 2)}\n`);
+      }
     } catch (error) {
       this.fileConfig = previous;
       this.configError = `Could not read provider configuration: ${message(error)}`;
@@ -186,23 +222,28 @@ export class AgentSettingsStore {
 
   snapshot(): AgentProviderSettings {
     const effective = this.effectiveValues();
-    const secureKey = this.readSecureApiKey();
     const referencedKey = this.fileConfig.openaiCompatible.apiKeyEnv
       ? this.env[this.fileConfig.openaiCompatible.apiKeyEnv]
       : undefined;
     const hasEnvironmentKey = Boolean(this.environmentApiKey || referencedKey);
+    // Do not touch Keychain/credential storage when an environment key already
+    // wins. Besides being unnecessary, a newly signed local build may trigger a
+    // blocking OS authorization prompt before the first application window exists.
+    const secureKey = hasEnvironmentKey ? undefined : this.readSecureApiKey();
     return {
       provider: effective.provider,
       baseUrl: effective.baseUrl,
       model: effective.model,
       vision: effective.vision,
+      modelPresets: this.fileConfig.openaiCompatible.modelPresets,
       hasApiKey: Boolean(hasEnvironmentKey || secureKey),
       apiKeySource: hasEnvironmentKey
         ? "environment"
         : secureKey
           ? "secure-storage"
           : "none",
-      secureStorageAvailable: this.options.codec.available(),
+      secureStorageAvailable:
+        this.options.secureStorageAvailable ?? this.options.codec.available(),
       configPath: this.options.configPath,
       ...(this.configError ? { configError: this.configError } : {}),
       environmentOverrides: this.environmentOverrides(),
@@ -226,7 +267,7 @@ export class AgentSettingsStore {
   }
 
   preview(input: AgentProviderSettingsInput): AgentRuntimeConfiguration {
-    const config = validateInput(input);
+    const config = validateInput(input, this.fileConfig.openaiCompatible.modelPresets);
     if (config.provider === "copilot") return { provider: "copilot" };
     const typedKey = input.apiKey?.trim();
     const existingKey = input.clearApiKey ? undefined : this.runtimeApiKey();
@@ -240,7 +281,7 @@ export class AgentSettingsStore {
   }
 
   save(input: AgentProviderSettingsInput): AgentProviderSettings {
-    const config = validateInput(input);
+    const config = validateInput(input, this.fileConfig.openaiCompatible.modelPresets);
     const apiKeyEnv = this.fileConfig.openaiCompatible.apiKeyEnv;
     if (apiKeyEnv) config.openaiCompatible.apiKeyEnv = apiKeyEnv;
     const typedKey = input.apiKey?.trim();
@@ -301,7 +342,9 @@ export class AgentSettingsStore {
   }
 
   private readSecureApiKey(): string | undefined {
-    if (!this.options.codec.available() || !existsSync(this.options.secretPath)) return undefined;
+    // File existence is cheap and avoids waking the native credential service
+    // when the user has never stored a key.
+    if (!existsSync(this.options.secretPath) || !this.options.codec.available()) return undefined;
     try {
       const parsed = SecretSchema.parse(
         JSON.parse(readFileSync(this.options.secretPath, "utf8")),

@@ -58,6 +58,10 @@ test("provider settings persist non-secrets and keep the API key encrypted", (t)
   t.after(() => rmSync(root, { recursive: true, force: true }));
 
   assert.equal(store.snapshot().provider, "copilot");
+  assert.deepEqual(
+    store.snapshot().modelPresets.map((preset) => preset.id),
+    ["qwen3.7-plus", "qwen3.8-max", "kimi-k2.5", "kimi-k2.6"],
+  );
   const saved = store.save({
     provider: "openai-compatible",
     baseUrl: "http://127.0.0.1:11434/v1/",
@@ -71,6 +75,7 @@ test("provider settings persist non-secrets and keep the API key encrypted", (t)
   assert.equal(saved.apiKeySource, "secure-storage");
   const configText = readFileSync(saved.configPath, "utf8");
   assert.doesNotMatch(configText, /secret-value/);
+  assert.match(configText, /"modelPresets"/);
   assert.match(readFileSync(path.join(root, "agent-provider.secrets.json"), "utf8"), /c2VhbGVk/);
   assert.deepEqual(store.runtimeConfiguration(), {
     provider: "openai-compatible",
@@ -79,6 +84,42 @@ test("provider settings persist non-secrets and keep the API key encrypted", (t)
     supportsVision: true,
     apiKey: "secret-value",
   });
+});
+
+test("model presets are globally configurable and survive UI settings saves", (t) => {
+  const { root, store } = fixture();
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  writeFileSync(
+    path.join(root, "agent-provider.json"),
+    JSON.stringify({
+      version: 1,
+      provider: "openai-compatible",
+      openaiCompatible: {
+        baseUrl: "https://custom.example/v1",
+        model: "company-vision",
+        vision: true,
+        modelPresets: [{
+          id: "company-vision",
+          label: "Company Vision",
+          badge: "CV",
+          source: "Internal gateway",
+          verified: true,
+          capabilities: ["vision", "function-calling"],
+        }],
+      },
+    }),
+  );
+
+  const reloaded = store.reload();
+  assert.deepEqual(reloaded.modelPresets.map((preset) => preset.id), ["company-vision"]);
+  const saved = store.save({
+    provider: "openai-compatible",
+    baseUrl: reloaded.baseUrl,
+    model: reloaded.model,
+    vision: reloaded.vision,
+  });
+  assert.deepEqual(saved.modelPresets.map((preset) => preset.id), ["company-vision"]);
+  assert.match(readFileSync(saved.configPath, "utf8"), /"Internal gateway"/);
 });
 
 test("environment overrides win over the configuration file", (t) => {
@@ -112,6 +153,38 @@ test("environment overrides win over the configuration file", (t) => {
   assert.deepEqual(snapshot.environmentOverrides, ["provider", "baseUrl", "model", "vision", "apiKey"]);
   const runtime = store.runtimeConfiguration();
   assert.equal(runtime.provider === "openai-compatible" ? runtime.apiKey : undefined, "environment-key");
+});
+
+test("an environment API key avoids unnecessary secure-storage decryption", (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "skill-recorder-settings-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  let decryptCalls = 0;
+  let availabilityCalls = 0;
+  const store = new AgentSettingsStore({
+    configPath: path.join(root, "agent-provider.json"),
+    secretPath: path.join(root, "agent-provider.secrets.json"),
+    codec: {
+      ...testCodec,
+      available: () => {
+        availabilityCalls += 1;
+        return true;
+      },
+      decrypt: (value) => {
+        decryptCalls += 1;
+        return testCodec.decrypt(value);
+      },
+    },
+    secureStorageAvailable: true,
+    env: { [OPENAI_COMPATIBLE_ENV.apiKey]: "environment-key" },
+  });
+  writeFileSync(
+    path.join(root, "agent-provider.secrets.json"),
+    JSON.stringify({ version: 1, apiKey: Buffer.from("sealed:stored-key").toString("base64") }),
+  );
+
+  assert.equal(store.snapshot().apiKeySource, "environment");
+  assert.equal(decryptCalls, 0);
+  assert.equal(availabilityCalls, 0);
 });
 
 test("an invalid hand-edited file reports an error without replacing the active config", (t) => {

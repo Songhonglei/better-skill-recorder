@@ -340,6 +340,11 @@ app.whenReady().then(async () => {
       encrypt: (value) => safeStorage.encryptString(value),
       decrypt: (value) => safeStorage.decryptString(value),
     },
+    // Native encrypted storage is built in on macOS/Windows. Probing it during
+    // startup can synchronously wake Keychain before the first window exists;
+    // Linux still needs its backend check to reject the basic_text fallback.
+    secureStorageAvailable:
+      process.platform === "linux" ? safeStorageIsUsable(safeStorage) : true,
   });
   const agentRuntimes = createAgentRuntimeFactoryFromConfig(
     agentSettings.runtimeConfiguration(),

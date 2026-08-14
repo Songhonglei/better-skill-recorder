@@ -1,5 +1,16 @@
 export type ConfiguredAgentProvider = "copilot" | "openai-compatible";
 
+export interface AgentModelPreset {
+  id: string;
+  label: string;
+  /** Short mark shown in the picker; derived from the label when omitted. */
+  badge?: string;
+  /** Endpoint or provider on which this preset was verified. */
+  source?: string;
+  verified?: boolean;
+  capabilities?: readonly string[];
+}
+
 /** Persisted, non-secret provider configuration. API keys never belong here. */
 export interface AgentProviderConfigFile {
   version: 1;
@@ -8,6 +19,8 @@ export interface AgentProviderConfigFile {
     baseUrl: string;
     model: string;
     vision: boolean;
+    /** Global, user-editable choices rendered by the model picker. */
+    modelPresets: AgentModelPreset[];
     /** Optional environment-variable indirection for hand-authored config files. */
     apiKeyEnv?: string;
   };
@@ -18,6 +31,7 @@ export interface AgentProviderSettings {
   baseUrl: string;
   model: string;
   vision: boolean;
+  modelPresets: readonly AgentModelPreset[];
   hasApiKey: boolean;
   apiKeySource: "none" | "secure-storage" | "environment";
   secureStorageAvailable: boolean;

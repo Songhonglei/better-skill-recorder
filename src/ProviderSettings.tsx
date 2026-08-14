@@ -236,13 +236,65 @@ export function ProviderSettings({
           <label className="provider-field">
             <span>Model ID</span>
             <input
+              list="verified-model-presets"
               value={model}
               onChange={(event) => { setModel(event.target.value); setTestResult(null); }}
               placeholder="your-vision-model"
               disabled={provider !== "openai-compatible"}
               spellCheck={false}
             />
+            <datalist id="verified-model-presets">
+              {initial.modelPresets.map((preset) => (
+                <option key={preset.id} value={preset.id}>{preset.label}</option>
+              ))}
+            </datalist>
           </label>
+          <div className="provider-presets wide" aria-label="Configured model presets">
+            <div className="provider-presets-head">
+              <span>
+                <strong>Model presets</strong>
+                <small>Globally managed in agent-provider.json</small>
+              </span>
+              <em>{initial.modelPresets.length} READY</em>
+            </div>
+            <div className="provider-preset-list">
+              {initial.modelPresets.map((preset) => {
+                const selected = model.trim() === preset.id;
+                const supportsVision = preset.capabilities?.includes("vision") ?? false;
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    className={selected ? "selected" : ""}
+                    aria-pressed={selected}
+                    disabled={provider !== "openai-compatible"}
+                    onClick={() => {
+                      setModel(preset.id);
+                      if (supportsVision) setVision(true);
+                      setTestResult(null);
+                    }}
+                    title={preset.source
+                      ? `${preset.label} — ${preset.verified ? "verified on" : "configured for"} ${preset.source}`
+                      : preset.label}
+                  >
+                    <span className="provider-preset-mark" aria-hidden>
+                      {preset.badge ?? preset.label.slice(0, 1).toUpperCase()}
+                    </span>
+                    <span>
+                      <strong>{preset.label}</strong>
+                      <code>{preset.id}</code>
+                    </span>
+                    <i aria-label={preset.verified ? "Verified" : undefined}>
+                      {preset.verified ? "✓" : ""}
+                    </i>
+                  </button>
+                );
+              })}
+            </div>
+            <small className="provider-presets-note">
+              Edit modelPresets in the global JSON file, reload it here, or enter any compatible model ID above.
+            </small>
+          </div>
           <div className="provider-field provider-key-field">
             <label htmlFor="provider-api-key">API Key</label>
             <div className="provider-secret-input">
