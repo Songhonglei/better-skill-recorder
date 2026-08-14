@@ -40,7 +40,7 @@ interface ChatToolCall {
 
 type ChatUserContentPart =
   | { type: "text"; text: string }
-  | { type: "image_url"; image_url: { url: string; detail: "auto" } };
+  | { type: "image_url"; image_url: { url: string } };
 
 type ChatMessage =
   | { role: "system"; content: string }
@@ -202,7 +202,6 @@ function toolResultContent(result: AgentToolResult, supportsVision: boolean): {
       type: "image_url" as const,
       image_url: {
         url: `data:${item.mimeType};base64,${item.data}`,
-        detail: "auto" as const,
       },
     };
   });

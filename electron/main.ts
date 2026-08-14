@@ -162,7 +162,7 @@ async function testAgentConfiguration(config: AgentRuntimeConfiguration): Promis
       tools: [
         ...(vision ? [{
           name: "provider_probe_image",
-          description: "Return a harmless one-pixel PNG to verify image tool-result transport.",
+          description: "Return a harmless 16-pixel PNG to verify image tool-result transport.",
           parameters: { type: "object", properties: {}, additionalProperties: false },
           handler: () => ({
             resultType: "success" as const,
@@ -170,7 +170,7 @@ async function testAgentConfiguration(config: AgentRuntimeConfiguration): Promis
             binaryResultsForLlm: [{
               type: "image" as const,
               mimeType: "image/png",
-              data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z4xQAAAAASUVORK5CYII=",
+              data: "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAE0lEQVQ4jWNgGAWjYBSMAgYwAAAEEAABPVV/HQAAAABJRU5ErkJggg==",
             }],
           }),
         }] : []),

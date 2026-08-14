@@ -192,7 +192,7 @@ test("vision-enabled runtime forwards inline image tool results to the next mode
     { type: "text", text: "Images returned by tool get_frames for call frames-1:" },
     {
       type: "image_url",
-      image_url: { url: "data:image/jpeg;base64,aGVsbG8=", detail: "auto" },
+      image_url: { url: "data:image/jpeg;base64,aGVsbG8=" },
     },
   ]);
 });
