@@ -101,6 +101,7 @@ export function createAutomationBuilderTools(ctx: AutomationToolContext): AgentT
 
   const proposePlan: AgentTool = {
     name: "propose_automation_plan",
+    completesRun: true,
     description:
       "Propose your reviewable plan for the automation: how you'll generalize the task, the trigger (propose a sensible default schedule), the fixed values it hard-codes (each referenced by a {{id}} token in the step prompts), and the generalized ordered prompt-steps. Call this once per turn, then STOP so the user can review or refine it (especially the schedule).",
     parameters: {

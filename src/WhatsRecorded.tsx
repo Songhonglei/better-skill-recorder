@@ -154,7 +154,8 @@ export function WhatsRecorded({
             <li>
               When you choose Analyze, the event timeline (window and document titles, URLs, and
               clipboard previews), plus screen images and narration text if recorded, are sent to
-              GitHub&apos;s cloud service and processed by GitHub Copilot.
+              the configured analysis provider. GitHub Copilot cloud is the default; a source
+              preview can instead use an explicitly configured custom endpoint.
             </li>
             <li>
               By default, before anything is sent, this computer hides sensitive details like

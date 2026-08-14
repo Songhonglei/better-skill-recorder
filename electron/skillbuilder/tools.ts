@@ -31,6 +31,7 @@ export function createSkillBuilderTools(ctx: SkillToolContext): AgentTool[] {
 
   const proposePlan: AgentTool = {
     name: "propose_plan",
+    completesRun: true,
     description:
       "Propose your reviewable plan for the skill: how you'll generalize the task, the fixed values it hard-codes (each a small id + human name + the literal, referenced from the steps by a {{id}} token), the ordered steps (each with a short title, a description, and the native tool it uses), and the allowed-tools. Call this once per turn, then STOP so the user can review or refine it. Do NOT write the skill body yet.",
     parameters: {
@@ -131,6 +132,7 @@ export function createSkillBuilderTools(ctx: SkillToolContext): AgentTool[] {
 
   const submitSkill: AgentTool = {
     name: "submit_skill",
+    completesRun: true,
     description:
       "Submit the final skill AFTER the user approves the plan: the SKILL.md name, description, allowed-tools, and the markdown instructions body. The body must be a generalized, native-tool-first procedure written imperatively to the agent.",
     parameters: {

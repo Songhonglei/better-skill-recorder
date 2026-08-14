@@ -26,7 +26,14 @@ export interface AgentTool {
   name: string;
   description: string;
   parameters: AgentJsonSchema;
+  /** A successful call ends the current model turn (for validated submission tools). */
+  completesRun?: boolean;
   handler(input: unknown): AgentToolResult | Promise<AgentToolResult>;
+}
+
+export interface AgentRuntimeCapabilities {
+  /** Whether this runtime can return inline image results from custom tools. */
+  vision: boolean;
 }
 
 export interface AgentConnectionStatus {
@@ -61,6 +68,7 @@ export interface AgentSession {
 /** The only provider surface business workflows are allowed to depend on. */
 export interface AgentRuntime {
   readonly id: AgentProviderId;
+  readonly capabilities: AgentRuntimeCapabilities;
   checkConnection(signal?: AbortSignal): Promise<AgentConnectionStatus>;
   listModels?(signal?: AbortSignal): Promise<AgentModelInfo[]>;
   createSession(options: AgentSessionOptions): Promise<AgentSession>;

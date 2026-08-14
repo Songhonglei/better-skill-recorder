@@ -67,14 +67,17 @@ function readNarration(sessionDir: string): NarrationTranscript | null {
 }
 
 /**
- * Build the custom in-process tools exposed to one Copilot session. Handlers run
- * in the Electron main process (dispatched over JSON-RPC by the SDK), read the
+ * Build the custom in-process tools exposed to one agent session. Handlers run
+ * in the Electron main process, read the
  * session's captured signals, and — for frames — return the JPEGs **inline** so
  * the model can see the screen without any `view`/`bash` tool. `submit_analysis`
  * captures guaranteed-structured output. The whole surface is sandboxed to the
  * one session dir.
  */
-export function createDescriberTools(ctx: ToolContext): AgentTool[] {
+export function createDescriberTools(
+  ctx: ToolContext,
+  options: { includeFrames?: boolean } = {},
+): AgentTool[] {
   const { sessionDir, startedAt, extractor, onSubmit } = ctx;
   const progress = (m: string) => ctx.onProgress?.(m);
   // Mask detected sensitive values in every outgoing text field (null slot = no-op).
@@ -357,6 +360,7 @@ export function createDescriberTools(ctx: ToolContext): AgentTool[] {
 
   const submitAnalysis: AgentTool = {
     name: "submit_analysis",
+    completesRun: true,
     description:
       "Submit your final structured analysis: the overall intent and the ordered list of steps. Call this exactly once when confident (and again on later turns after incorporating feedback).",
     parameters: {
@@ -416,5 +420,7 @@ export function createDescriberTools(ctx: ToolContext): AgentTool[] {
     },
   };
 
-  return [getTimeline, getEvents, getNarration, listFrames, getFrames, submitAnalysis];
+  return options.includeFrames === false
+    ? [getTimeline, getEvents, getNarration, submitAnalysis]
+    : [getTimeline, getEvents, getNarration, listFrames, getFrames, submitAnalysis];
 }

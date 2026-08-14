@@ -1,6 +1,6 @@
 /**
  * The describer **brief** — the agent's system message (appended to the SDK
- * foundation). It tells the Copilot CLI agent its job, the tools it has, the
+ * foundation). It tells the configured agent its job, the tools it has, the
  * method to follow, and the exact structured output it must produce. This is the
  * "skill" in the loose sense: a human-editable instruction document, NOT a
  * packaged Copilot CLI skill directory and NOT a `.github/extensions` extension.

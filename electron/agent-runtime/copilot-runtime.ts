@@ -66,6 +66,7 @@ class CopilotAgentSession implements AgentSession {
 /** Provider adapter that preserves the existing Copilot CLI/SDK behavior. */
 export class CopilotAgentRuntime implements AgentRuntime {
   readonly id = "copilot" as const;
+  readonly capabilities = { vision: true } as const;
 
   private client: CopilotClientPort | null = null;
   private clientStart: Promise<AgentConnectionStatus> | null = null;

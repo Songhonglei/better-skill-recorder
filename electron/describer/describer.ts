@@ -28,10 +28,13 @@ const TURN_TIMEOUT_MS = 180_000;
 /** Cap on simultaneously-held live agent sessions; oldest idle ones are evicted. */
 const MAX_LIVE_SESSIONS = 4;
 
-const KICKOFF_PROMPT =
-  "Reconstruct what the user did in this recording. Start with get_timeline, then read events " +
-  "where anything is unclear, and look at frames only where the events are ambiguous. When " +
-  "confident, call submit_analysis with the overall intent and the ordered list of steps.";
+function kickoffPrompt(vision: boolean): string {
+  return (
+    "Reconstruct what the user did in this recording. Start with get_timeline, then read events " +
+    (vision ? "where anything is unclear, and look at frames only where the events are ambiguous. " : "where anything is unclear. Screen frames are unavailable for this provider. ") +
+    "When confident, call submit_analysis with the overall intent and the ordered list of steps."
+  );
+}
 
 const NUDGE_PROMPT =
   "Please call submit_analysis now with your best analysis of the overall intent and the ordered steps.";
@@ -105,7 +108,7 @@ export class Describer {
       await this.disposeLive(sessionId); // fresh conversation each explicit analyze
       const live = await this.createLive(sessionId);
       live.redaction.current = redaction ?? null;
-      return await this.runTurn(live, KICKOFF_PROMPT);
+      return await this.runTurn(live, kickoffPrompt(this.runtime.capabilities.vision));
     } finally {
       this.active.delete(sessionId);
     }
@@ -122,7 +125,11 @@ export class Describer {
       const prior = loadPersistedAnalysis(sessionId);
       // The feedback round is recorded in runTurn only after it produces a
       // revision, so a failed turn never leaves a phantom log entry.
-      return await this.runTurn(live, renderFeedbackPrompt(fb, prior), fb);
+      return await this.runTurn(
+        live,
+        renderFeedbackPrompt(fb, prior, this.runtime.capabilities.vision),
+        fb,
+      );
     } finally {
       this.active.delete(sessionId);
     }
@@ -232,6 +239,9 @@ export class Describer {
     const holder: LiveSession["holder"] = { submission: undefined };
     const redaction: LiveSession["redaction"] = { current: null };
 
+    await this.ensureRuntime();
+    const vision = this.runtime.capabilities.vision;
+
     const tools = createDescriberTools({
       sessionDir: dir,
       startedAt: meta.startedAt,
@@ -241,13 +251,14 @@ export class Describer {
       onSubmit: (s) => {
         holder.submission = s;
       },
-    });
+    }, { includeFrames: vision });
 
-    await this.ensureRuntime();
     // Always constrain the agent to our sandboxed custom tools. A runtime must
     // honor this exact list rather than exposing provider-default capabilities.
     const agent = await this.runtime.createSession({
-      systemInstructions: DESCRIBER_INSTRUCTIONS,
+      systemInstructions: vision
+        ? DESCRIBER_INSTRUCTIONS
+        : `${DESCRIBER_INSTRUCTIONS}\n\n## Provider limitation\nScreen frame tools are unavailable in this text-only Analyze mode. Do not request or rely on images; use timeline, events, and narration only.`,
       tools,
       workingDirectory: dir,
       ...(this.model ? { model: this.model } : {}),
@@ -367,10 +378,14 @@ function buildExtractor(sessionDir: string): FrameExtractor | null {
   });
 }
 
-function renderFeedbackPrompt(fb: AnalysisFeedback, prior: Analysis | null): string {
+function renderFeedbackPrompt(
+  fb: AnalysisFeedback,
+  prior: Analysis | null,
+  vision: boolean,
+): string {
   const lines: string[] = [
     "The user reviewed your analysis and left feedback. Revise the ENTIRE analysis accordingly and",
-    "call submit_analysis again. Re-examine signals (get_events / get_frames) where the feedback",
+    `call submit_analysis again. Re-examine signals (${vision ? "get_events / get_frames" : "get_events / get_narration"}) where the feedback`,
     "points to a gap or error. Keep step ids stable for steps that don't change.",
     "",
   ];

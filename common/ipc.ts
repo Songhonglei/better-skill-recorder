@@ -117,7 +117,7 @@ export interface AnalyzeResult {
   error?: string;
   /**
    * Present when the on-device pre-send scan redacted potentially sensitive
-   * details before the session was sent to GitHub Copilot — masked values in the
+   * details before the session was sent to the configured analysis provider — masked values in the
    * captured text, plus a count of on-screen regions blurred in frames. This is
    * purely informational — the analysis still ran and `ok` is unaffected. The
    * report carries only masked values + short redacted context, never raw values,
@@ -529,7 +529,7 @@ export interface SkillRecorderApi {
    *  panel rehydrate when an already-analyzed session is reopened (the live `review`
    *  from {@link analyze} is transient). Contains only masked values + counts. */
   getSensitiveReport(sessionId: string): Promise<SensitiveReport | null>;
-  /** Run the Copilot describer on a session (defaults to the last completed one).
+  /** Run the configured describer on a session (defaults to the last completed one).
    *  Runs an on-device sensitive-detail scan first and redacts any flagged values
    *  from the text before it is sent — non-blocking; the analysis always proceeds
    *  and any redaction is reported back in `review`. */

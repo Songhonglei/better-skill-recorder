@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /**
- * The structured result of the Copilot describer: a high-level **intent** plus an
+ * The structured result of the configured describer: a high-level **intent** plus an
  * ordered list of **actions/steps**, produced by the multi-turn agent and revised
  * from the user's natural-language feedback. This is the stable contract shared by
  * the agent's `submit_analysis` tool, the IPC surface, and on-disk persistence

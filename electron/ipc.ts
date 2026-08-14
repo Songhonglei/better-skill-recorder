@@ -244,7 +244,7 @@ export function registerIpc(
       await narration.ensureTranscribedForAnalysis(id);
       // On-device pre-send redaction (non-blocking): mask secrets/credentials/PII in
       // every outgoing text field — and, under Advanced protection, blur on-screen
-      // text in frames — before anything reaches GitHub Copilot. Analysis always
+      // text in frames — before anything reaches the configured provider. Analysis always
       // proceeds; the (raw-value-free) report is returned purely for a UI summary.
       const { redaction, report } = await buildRedaction(id);
       try {
