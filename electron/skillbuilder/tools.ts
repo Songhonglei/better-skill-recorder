@@ -1,5 +1,3 @@
-import type { Tool } from "@github/copilot-sdk";
-
 import {
   SkillPlanSchema,
   SkillSubmissionSchema,
@@ -7,6 +5,7 @@ import {
   type SkillPlan,
   type SkillSubmission,
 } from "../../common/skill";
+import type { AgentTool } from "../agent-runtime/types";
 
 /** Everything the builder's skill-specific tools are bound to for one session. */
 export interface SkillToolContext {
@@ -26,11 +25,11 @@ export interface SkillToolContext {
  * the final skill (submit_skill). Both submissions are zod-validated; the
  * architecture is injected server-side so the agent can't set it.
  */
-export function createSkillBuilderTools(ctx: SkillToolContext): Tool[] {
+export function createSkillBuilderTools(ctx: SkillToolContext): AgentTool[] {
   const { architecture, onPlan, onSubmit } = ctx;
   const progress = (m: string) => ctx.onProgress?.(m);
 
-  const proposePlan: Tool = {
+  const proposePlan: AgentTool = {
     name: "propose_plan",
     description:
       "Propose your reviewable plan for the skill: how you'll generalize the task, the fixed values it hard-codes (each a small id + human name + the literal, referenced from the steps by a {{id}} token), the ordered steps (each with a short title, a description, and the native tool it uses), and the allowed-tools. Call this once per turn, then STOP so the user can review or refine it. Do NOT write the skill body yet.",
@@ -130,7 +129,7 @@ export function createSkillBuilderTools(ctx: SkillToolContext): Tool[] {
     },
   };
 
-  const submitSkill: Tool = {
+  const submitSkill: AgentTool = {
     name: "submit_skill",
     description:
       "Submit the final skill AFTER the user approves the plan: the SKILL.md name, description, allowed-tools, and the markdown instructions body. The body must be a generalized, native-tool-first procedure written imperatively to the agent.",

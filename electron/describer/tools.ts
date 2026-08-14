@@ -1,8 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
-import type { Tool } from "@github/copilot-sdk";
-
 import { AnalysisSubmissionSchema, type AnalysisSubmission } from "../../common/analysis";
 import { MEANINGFUL_EVENT_TYPES } from "../../common/correlation";
 import type { SessionBundle } from "../../common/bundle";
@@ -12,6 +10,7 @@ import { readEvents } from "../frames/correlate";
 import type { FrameExtractor } from "../frames/extractor";
 import type { FrameRedactor } from "../sensitive/frame-redact";
 import { createLogger } from "../logger";
+import type { AgentTool } from "../agent-runtime/types";
 
 const log = createLogger("Describer/tools");
 
@@ -75,7 +74,7 @@ function readNarration(sessionDir: string): NarrationTranscript | null {
  * captures guaranteed-structured output. The whole surface is sandboxed to the
  * one session dir.
  */
-export function createDescriberTools(ctx: ToolContext): Tool[] {
+export function createDescriberTools(ctx: ToolContext): AgentTool[] {
   const { sessionDir, startedAt, extractor, onSubmit } = ctx;
   const progress = (m: string) => ctx.onProgress?.(m);
   // Mask detected sensitive values in every outgoing text field (null slot = no-op).
@@ -88,7 +87,7 @@ export function createDescriberTools(ctx: ToolContext): Tool[] {
     return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
   };
 
-  const getTimeline: Tool = {
+  const getTimeline: AgentTool = {
     name: "get_timeline",
     description:
       "Return the segmented session timeline: ordered steps with their start time (atMs, ms since recording start), duration, app, urls, titles, commands, clipboard counts and markers. Call this first.",
@@ -123,7 +122,7 @@ export function createDescriberTools(ctx: ToolContext): Tool[] {
     },
   };
 
-  const getEvents: Tool = {
+  const getEvents: AgentTool = {
     name: "get_events",
     description:
       "Return the raw event stream (with clipboard text, full titles, full URLs, commands). Optionally filter by `types` (e.g. [\"browser.url\",\"clipboard.change\"]) and/or a time window `fromMs`/`toMs` (atMs, ms since recording start). Defaults to the meaningful events across the whole session.",
@@ -182,7 +181,7 @@ export function createDescriberTools(ctx: ToolContext): Tool[] {
     },
   };
 
-  const listFrames: Tool = {
+  const listFrames: AgentTool = {
     name: "list_frames",
     description:
       "List the screen frames already available for this session (file, atMs, source, reason). Returns an empty list when no video was recorded. Use get_frames to actually view frames.",
@@ -200,7 +199,7 @@ export function createDescriberTools(ctx: ToolContext): Tool[] {
     },
   };
 
-  const getFrames: Tool = {
+  const getFrames: AgentTool = {
     name: "get_frames",
     description:
       "Sample and VIEW the available 1 fps screen snapshots within a time window [fromMs, toMs] (atMs, ms since recording start) and return them inline as images. Optional `fps` can reduce sampling density but cannot add detail beyond the 1 fps capture. Optional `crop` {x,y,w,h} zooms a region. Use only where events are ambiguous.",
@@ -324,7 +323,7 @@ export function createDescriberTools(ctx: ToolContext): Tool[] {
     },
   };
 
-  const getNarration: Tool = {
+  const getNarration: AgentTool = {
     name: "get_narration",
     description:
       "Return the user's spoken voice narration for this session as timestamped lines ([mm:ss] text). This is the user's own words describing what they are doing and why, so treat it as the most direct statement of intent and use it to name and order the steps. Optionally pass `query` to return only lines containing that text (case-insensitive). Returns a note when the user recorded no narration.",
@@ -356,7 +355,7 @@ export function createDescriberTools(ctx: ToolContext): Tool[] {
     },
   };
 
-  const submitAnalysis: Tool = {
+  const submitAnalysis: AgentTool = {
     name: "submit_analysis",
     description:
       "Submit your final structured analysis: the overall intent and the ordered list of steps. Call this exactly once when confident (and again on later turns after incorporating feedback).",
