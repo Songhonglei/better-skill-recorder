@@ -105,6 +105,7 @@ test("custom endpoint Analyze and feedback persist validated text-only analysis"
     baseUrl: `http://127.0.0.1:${port}/v1`,
     apiKey: "fixture-key",
     model: "fixture-model",
+    supportsVision: false,
   });
   const describer = new Describer(() => undefined, runtime);
   t.after(() => describer.dispose());

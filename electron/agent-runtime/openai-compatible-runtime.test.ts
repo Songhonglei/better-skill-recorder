@@ -87,6 +87,7 @@ test("OpenAI-compatible runtime executes text tools sequentially and preserves h
   });
 
   await session.run("Start", { timeoutMs: 5_000 });
+  assert.deepEqual(runtime.capabilities, { vision: true });
   assert.deepEqual(calls, [
     { name: "read", input: { topic: "timeline" } },
     { name: "submit", input: { intent: "Test" } },

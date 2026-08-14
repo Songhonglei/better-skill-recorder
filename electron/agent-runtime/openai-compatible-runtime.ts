@@ -23,7 +23,7 @@ export interface OpenAICompatibleRuntimeConfig {
   /** Held only by the runtime. Empty is allowed for local endpoints without auth. */
   apiKey?: string;
   model: string;
-  /** Explicit opt-in; false unless the configured model is known to accept images. */
+  /** Enabled by default; set false only for a model known not to accept images. */
   supportsVision?: boolean;
   maxTurns?: number;
   maxToolCallsPerTurn?: number;
@@ -451,7 +451,7 @@ export class OpenAICompatibleRuntime implements AgentRuntime {
     private readonly config: OpenAICompatibleRuntimeConfig,
     private readonly fetcher: AgentFetch = globalThis.fetch.bind(globalThis),
   ) {
-    this.capabilities = { vision: config.supportsVision === true };
+    this.capabilities = { vision: config.supportsVision !== false };
   }
 
   async checkConnection(signal?: AbortSignal): Promise<AgentConnectionStatus> {

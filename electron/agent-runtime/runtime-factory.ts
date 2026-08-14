@@ -15,6 +15,14 @@ export interface AgentRuntimeFactory {
   create(label: string): AgentRuntime;
 }
 
+function visionEnabled(raw: string | undefined): boolean {
+  const value = raw?.trim().toLowerCase();
+  if (!value) return true;
+  if (["true", "1", "yes", "on"].includes(value)) return true;
+  if (["false", "0", "no", "off"].includes(value)) return false;
+  throw new Error(`${OPENAI_COMPATIBLE_ENV.vision} must be true or false.`);
+}
+
 /**
  * Preview configuration bridge. The API key is read once into this in-memory factory and
  * removed from the process environment, so it is never persisted by the app.
@@ -43,7 +51,7 @@ export function createAgentRuntimeFactory(
     baseUrl: env[OPENAI_COMPATIBLE_ENV.baseUrl] ?? "",
     ...(apiKey ? { apiKey } : {}),
     model: env[OPENAI_COMPATIBLE_ENV.model] ?? "",
-    supportsVision: env[OPENAI_COMPATIBLE_ENV.vision]?.trim().toLowerCase() === "true",
+    supportsVision: visionEnabled(env[OPENAI_COMPATIBLE_ENV.vision]),
   };
   return {
     provider: "openai-compatible",

@@ -13,7 +13,6 @@ test("Analyze runtime defaults to Copilot and accepts temporary custom configura
     [OPENAI_COMPATIBLE_ENV.baseUrl]: "http://127.0.0.1:1234/v1",
     [OPENAI_COMPATIBLE_ENV.apiKey]: "temporary-key",
     [OPENAI_COMPATIBLE_ENV.model]: "local-model",
-    [OPENAI_COMPATIBLE_ENV.vision]: "true",
   };
   const customRuntime = createAnalyzeRuntime("FactoryTest", env);
   assert.equal(customRuntime.id, "openai-compatible");
@@ -24,6 +23,21 @@ test("Analyze runtime defaults to Copilot and accepts temporary custom configura
   // Caller-owned configuration is not mutated; only the real process environment is scrubbed.
   assert.equal(env[OPENAI_COMPATIBLE_ENV.apiKey], "temporary-key");
   await customRuntime.dispose();
+
+  const textRuntime = createAnalyzeRuntime("FactoryTest", {
+    ...env,
+    [OPENAI_COMPATIBLE_ENV.vision]: "false",
+  });
+  assert.deepEqual(textRuntime.capabilities, { vision: false });
+  await textRuntime.dispose();
+
+  assert.throws(
+    () => createAnalyzeRuntime("FactoryTest", {
+      ...env,
+      [OPENAI_COMPATIBLE_ENV.vision]: "maybe",
+    }),
+    /must be true or false/,
+  );
 });
 
 test("temporary API key is removed from the app process environment after bootstrap", async () => {
