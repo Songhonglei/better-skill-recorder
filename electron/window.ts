@@ -53,7 +53,7 @@ export function createRecorderWindow(): BrowserWindow {
     resizable: false,
     maximizable: false,
     fullscreenable: false,
-    title: "Skill Recorder",
+    title: "Better Skill Recorder",
     icon: windowIcon(),
     backgroundColor: "#faf8f5",
     webPreferences: {
@@ -96,7 +96,7 @@ export function createRecordingControlsWindow(): BrowserWindow {
     fullscreenable: false,
     closable: false,
     skipTaskbar: true,
-    title: "Skill Recorder: Recording controls",
+    title: "Better Skill Recorder: Recording controls",
     webPreferences: {
       preload: path.join(dirname, "preload.cjs"),
       contextIsolation: true,
@@ -188,7 +188,7 @@ export function createLibraryWindow(recorder: BrowserWindow): BrowserWindow {
     minWidth: LIBRARY.floorWidth,
     minHeight: 480,
     show: false,
-    title: "Skill Recorder: Sessions",
+    title: "Better Skill Recorder: Sessions",
     icon: windowIcon(),
     backgroundColor: "#faf8f5",
     webPreferences: {

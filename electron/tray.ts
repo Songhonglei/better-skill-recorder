@@ -29,7 +29,7 @@ export function createTray(
   showRecordingControls: () => void,
 ): Tray {
   const tray = new Tray(trayIcon() ?? fallbackTrayIcon());
-  tray.setToolTip("Skill Recorder");
+  tray.setToolTip("Better Skill Recorder");
 
   const rebuild = () => {
     const recording = recorder.state === "recording";

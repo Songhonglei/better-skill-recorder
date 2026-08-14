@@ -80,7 +80,7 @@ async function download(url, target) {
           accept: "application/octet-stream, text/plain;q=0.9, */*;q=0.8",
           "user-agent":
             "Mozilla/5.0 (compatible; SkillRecorderCompliance/1.0; " +
-            "+https://github.com/microsoft/skill-recorder)",
+            "+https://github.com/Songhonglei/better-skill-recorder)",
         },
       });
       if (!response.ok || !response.body) {

@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Skill Recorder contributors
 #
-# Builds Skill Recorder locally from an exact source commit on macOS or Ubuntu.
-# The script downloads no prebuilt Skill Recorder application.
+# Builds Better Skill Recorder locally from an exact source commit on macOS or Ubuntu.
+# The script downloads no prebuilt Better Skill Recorder application.
 
 set -euo pipefail
 umask 077
@@ -14,10 +14,10 @@ NO_LAUNCH="${SKILL_RECORDER_NO_LAUNCH:-}"
 DETACHED="${SKILL_RECORDER_DETACHED:-}"
 LOG_KEEP="${SKILL_RECORDER_LOG_KEEP:-5}"
 
-info() { printf '[Skill Recorder] %s\n' "$*"; }
-warn() { printf '[Skill Recorder] WARNING: %s\n' "$*" >&2; }
+info() { printf '[Better Skill Recorder] %s\n' "$*"; }
+warn() { printf '[Better Skill Recorder] WARNING: %s\n' "$*" >&2; }
 die() {
-  printf '[Skill Recorder] ERROR: %s\n' "$*" >&2
+  printf '[Better Skill Recorder] ERROR: %s\n' "$*" >&2
   exit 1
 }
 have() { command -v "$1" >/dev/null 2>&1; }
@@ -265,12 +265,12 @@ validate_existing_install() {
 build_source_install() {
   local source_directory="$1"
   local archive="$WORK_DIR/skill-recorder-$COMMIT.tar.gz"
-  info "Downloading Skill Recorder source commit $COMMIT."
-  download "https://codeload.github.com/microsoft/skill-recorder/tar.gz/$COMMIT" "$archive"
+  info "Downloading Better Skill Recorder source commit $COMMIT."
+  download "https://codeload.github.com/Songhonglei/better-skill-recorder/tar.gz/$COMMIT" "$archive"
 
   local top_directory
   top_directory="$(tar -tzf "$archive" | awk -F/ 'NR == 1 { first = $1 } END { print first }')"
-  [ "$top_directory" = "skill-recorder-$COMMIT" ] ||
+  [ "$top_directory" = "better-skill-recorder-$COMMIT" ] ||
     die "GitHub source archive did not contain the expected commit directory."
 
   STAGING_DIR="$VERSIONS_ROOT/.staging-$COMMIT-$$"
@@ -392,7 +392,7 @@ build_source_install() {
   [ -f .compliance/licenses/LGPL-3.0.txt ] ||
     die "The canonical LGPL-3.0 text was not generated."
 
-  info "Building Skill Recorder locally."
+  info "Building Better Skill Recorder locally."
   "$NPM" run build
 
   printf '%s\n' "$COMMIT" > .skill-recorder-commit
@@ -409,7 +409,7 @@ build_source_install() {
 write_macos_app() {
   local launcher="$1"
   local applications="$HOME/Applications"
-  local bundle="$applications/Skill Recorder (Source).app"
+  local bundle="$applications/Better Skill Recorder.app"
   local contents="$bundle/Contents"
   local macos_dir="$contents/MacOS"
   local executable_name="skill-recorder-source"
@@ -437,11 +437,11 @@ write_macos_app() {
       '<plist version="1.0">' \
       '<dict>' \
       '  <key>CFBundleName</key>' \
-      '  <string>Skill Recorder (Source)</string>' \
+      '  <string>Better Skill Recorder</string>' \
       '  <key>CFBundleDisplayName</key>' \
-      '  <string>Skill Recorder (Source)</string>' \
+      '  <string>Better Skill Recorder</string>' \
       '  <key>CFBundleIdentifier</key>' \
-      '  <string>com.skillrecorder.source</string>' \
+      '  <string>com.betterskillrecorder.source</string>' \
       '  <key>CFBundleExecutable</key>' \
       "  <string>$executable_name</string>" \
       '  <key>CFBundlePackageType</key>' \
@@ -487,8 +487,8 @@ write_launcher() {
       printf '%s\n' \
         '[Desktop Entry]' \
         'Type=Application' \
-        'Name=Skill Recorder (Source)' \
-        'Comment=Skill Recorder built locally from pinned source'
+        'Name=Better Skill Recorder' \
+        'Comment=Better Skill Recorder built locally from pinned source'
       printf 'Exec="%s"\n' "$launcher"
       printf '%s\n' \
         'Icon=applications-development' \
@@ -557,5 +557,5 @@ if [ -n "$DETACHED" ]; then
   exit 0
 fi
 
-info "Launching Skill Recorder."
+info "Launching Better Skill Recorder."
 exec "$LAUNCHER"

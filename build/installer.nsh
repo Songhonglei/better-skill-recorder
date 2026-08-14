@@ -1,4 +1,4 @@
-; Custom NSIS installer script for Skill Recorder
+; Custom NSIS installer script for Better Skill Recorder
 ; Adds a progress bar during file extraction
 
 !include "MUI2.nsh"

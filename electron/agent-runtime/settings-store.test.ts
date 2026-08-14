@@ -5,7 +5,11 @@ import path from "node:path";
 import test from "node:test";
 
 import { OPENAI_COMPATIBLE_ENV } from "./runtime-factory";
-import { AgentSettingsStore, type SecretCodec } from "./settings-store";
+import {
+  AgentSettingsStore,
+  safeStorageIsUsable,
+  type SecretCodec,
+} from "./settings-store";
 
 const testCodec: SecretCodec = {
   available: () => true,
@@ -23,6 +27,31 @@ function fixture(env: NodeJS.ProcessEnv = {}) {
   });
   return { root, store };
 }
+
+test("native secure storage availability is platform aware", () => {
+  const nativeStore = { isEncryptionAvailable: () => true };
+  assert.equal(safeStorageIsUsable(nativeStore, "darwin"), true);
+  assert.equal(safeStorageIsUsable(nativeStore, "win32"), true);
+  assert.equal(safeStorageIsUsable(nativeStore, "linux"), false);
+  assert.equal(
+    safeStorageIsUsable({
+      ...nativeStore,
+      getSelectedStorageBackend: () => "basic_text",
+    }, "linux"),
+    false,
+  );
+  assert.equal(
+    safeStorageIsUsable({
+      ...nativeStore,
+      getSelectedStorageBackend: () => "kwallet6",
+    }, "linux"),
+    true,
+  );
+  assert.equal(
+    safeStorageIsUsable({ isEncryptionAvailable: () => false }, "darwin"),
+    false,
+  );
+});
 
 test("provider settings persist non-secrets and keep the API key encrypted", (t) => {
   const { root, store } = fixture();

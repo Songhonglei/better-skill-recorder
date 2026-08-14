@@ -1978,7 +1978,7 @@ async function downloadWithRetry(url, target, fetchImpl) {
           accept: "application/octet-stream, text/plain;q=0.9, */*;q=0.8",
           "user-agent":
             "Mozilla/5.0 (compatible; SkillRecorderCompliance/1.0; " +
-            "+https://github.com/microsoft/skill-recorder)",
+            "+https://github.com/Songhonglei/better-skill-recorder)",
         },
       });
       if (!response.ok || !response.body) {
@@ -2018,8 +2018,8 @@ export function renderRelinking(native, sourceManifest, policy, platform = proce
     platform === "darwin"
       ? "Contents/Frameworks/Electron Framework.framework/Versions/A/Libraries/libffmpeg.dylib"
       : platform === "win32"
-        ? "ffmpeg.dll beside the Skill Recorder executable"
-        : "libffmpeg.so beside the Skill Recorder executable";
+        ? "ffmpeg.dll beside the Better Skill Recorder executable"
+        : "libffmpeg.so beside the Better Skill Recorder executable";
   const sharpBuildSource = sourceFile("sharp-libvips-build");
   const electronSource = sourceFile("electron");
   const ffmpegSource = sourceFile("electron-ffmpeg");
@@ -2032,8 +2032,8 @@ export function renderRelinking(native, sourceManifest, policy, platform = proce
   return [
     "# Replacing and relinking native libraries",
     "",
-    "Skill Recorder's own source is available under the MIT License at",
-    "https://github.com/microsoft/skill-recorder. The native libraries listed in",
+    "Better Skill Recorder's own source is available under the MIT License at",
+    "https://github.com/Songhonglei/better-skill-recorder. The native libraries listed in",
     "`NATIVE-COMPONENTS.json` remain under their own licenses.",
     "",
     "The packaged application keeps Sharp, libvips, and related native modules outside",
@@ -2051,7 +2051,7 @@ export function renderRelinking(native, sourceManifest, policy, platform = proce
     "You may replace these files with ABI-compatible modified builds. The application",
     "loads them from the plain filesystem locations above; it does not verify their",
     "signatures or hashes at run time and takes no technical measure to prevent a",
-    "modified replacement from running. You may also reverse engineer Skill Recorder to",
+    "modified replacement from running. You may also reverse engineer Better Skill Recorder to",
     "the extent necessary to debug modifications you make to those libraries.",
     "",
     "Exact upstream sources, packaging scripts, and build patches are included under",
@@ -2070,7 +2070,7 @@ export function renderRelinking(native, sourceManifest, policy, platform = proce
     "3. Run the packaging build for this platform and architecture as documented by the",
     "   unpacked scripts.",
     `4. Copy the rebuilt libraries over the files listed above under \`${nativeLocation}\`,`,
-    "   keeping the same file names, then start Skill Recorder normally.",
+    "   keeping the same file names, then start Better Skill Recorder normally.",
     "",
     `For Electron FFmpeg, start from \`${ffmpegSource}\`, apply \`${ffmpegPatch}\`,`,
     `and use the Electron build integration in \`${electronSource}\`. Replace the`,
@@ -2097,7 +2097,7 @@ function renderComplianceReadme(includeSources) {
   return [
     "# License and source materials",
     "",
-    "Keep this entire directory with every distributed copy of Skill Recorder.",
+    "Keep this entire directory with every distributed copy of Better Skill Recorder.",
     "",
     "- `THIRD-PARTY-LICENSES.txt` contains per-package license and attribution text.",
     "- `NATIVE-THIRD-PARTY-NOTICES.md` identifies libraries embedded in native payloads.",

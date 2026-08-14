@@ -72,12 +72,13 @@ All times are **\`atMs\` = milliseconds since the recording started**.
 8. **Call submit_analysis** with the intent and ordered steps.
 
 ## Noise to ignore
-- **The Skill Recorder app itself** (this Electron recorder, app name "Skill Recorder").
+- **The Better Skill Recorder app itself** (this Electron recorder; older recordings may
+  show the previous app name "Skill Recorder").
   Activating/focusing it is how the user reaches the Start and Stop buttons — it is NOT
-  part of their task. In particular, the FIRST step (focusing Skill Recorder to press Start,
-  usually at \`atMs\` ≈ 0) and the LAST step (returning to Skill Recorder to press Stop) are
+  part of their task. In particular, the FIRST step (focusing the recorder to press Start,
+  usually at \`atMs\` ≈ 0) and the LAST step (returning to the recorder to press Stop) are
   recorder bracketing, not user actions — do NOT emit them as steps. Also drop any mid-session
-  focus on Skill Recorder's floating controls to toggle the microphone, cancel a discard, or
+  focus on the recorder's floating controls to toggle the microphone, cancel a discard, or
   operate another recording control. The real task starts with the first non-recorder app the
   user works in.
 - \`UserNotificationCenter\` / OS permission dialogs (e.g. "requesting to record the

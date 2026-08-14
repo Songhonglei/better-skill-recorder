@@ -1,8 +1,8 @@
-# Skill Recorder
+# Better Skill Recorder
 
-**Record yourself doing a task once, then turn it into a skill your AI agent can repeat.**
+**Record yourself doing a task once, then turn it into a skill your AI agent can repeat—with the model provider you choose.**
 
-Skill Recorder captures a real work session on your screen: the clicks, the app and
+Better Skill Recorder captures a real work session on your screen: the clicks, the app and
 window switches, the pages you visit, and (if you want) your spoken narration. It then uses
 the **GitHub Copilot CLI** to reconstruct *what you actually did* as a clear **intent plus
 an ordered list of steps**. From there, one step turns that single run into something an
@@ -24,7 +24,7 @@ form can teach the agent to submit *all* of them.
 ## How it works
 
 1. 🔴 **Record.** Hit record (or `⌘⇧R` / `Ctrl+Shift+R` from anywhere) and just do your
-   task. Skill Recorder captures your screen and activity locally, in the background.
+   task. Better Skill Recorder captures your screen and activity locally, in the background.
 2. 🎛️ **Control.** While recording, a small always-on-top bar shows capture and
    microphone state. Mute, unmute, or switch mics on the fly, then finish, or discard
    (with a confirmation) if the take didn't go to plan.
@@ -36,8 +36,8 @@ form can teach the agent to submit *all* of them.
 
 ## Get started
 
-Skill Recorder is published as a **source release**: one command downloads a pinned Node.js
-runtime, builds the exact release commit on your machine, and adds a **Skill Recorder (Source)**
+Better Skill Recorder is published as a **source release**: one command downloads a pinned Node.js
+runtime, builds the exact release commit on your machine, and adds a **Better Skill Recorder**
 app you can relaunch anytime. Nothing is installed globally. You'll need a GitHub account with
 **Copilot access**; the Copilot CLI ships with the app.
 
@@ -46,47 +46,47 @@ macOS is the primary target. Windows 11 (x64 and ARM64) is supported too (see
 
 ### Install it
 
-Open the **[latest release](https://github.com/microsoft/skill-recorder/releases/latest)** and
+Open the **[latest release](https://github.com/Songhonglei/better-skill-recorder/releases/latest)** and
 copy the command for your platform. Each release pins an exact commit, so the real command looks
 like the patterns below with `<40-character-release-commit>` filled in.
 
 **macOS / Ubuntu**
 
 ```bash
-commit="<40-character-release-commit>"; curl -fsSL "https://raw.githubusercontent.com/microsoft/skill-recorder/$commit/install.sh" | SKILL_RECORDER_COMMIT="$commit" bash
+commit="<40-character-release-commit>"; curl -fsSL "https://raw.githubusercontent.com/Songhonglei/better-skill-recorder/$commit/install.sh" | SKILL_RECORDER_COMMIT="$commit" bash
 ```
 
 The commit pins both the downloaded script and the source it builds. To keep the app running
 after the terminal closes, add `SKILL_RECORDER_DETACHED=1` after the pipe:
 
 ```bash
-commit="<40-character-release-commit>"; curl -fsSL "https://raw.githubusercontent.com/microsoft/skill-recorder/$commit/install.sh" | SKILL_RECORDER_COMMIT="$commit" SKILL_RECORDER_DETACHED=1 bash
+commit="<40-character-release-commit>"; curl -fsSL "https://raw.githubusercontent.com/Songhonglei/better-skill-recorder/$commit/install.sh" | SKILL_RECORDER_COMMIT="$commit" SKILL_RECORDER_DETACHED=1 bash
 ```
 
-On macOS this adds a **Skill Recorder (Source)** app to `~/Applications` (relaunch from Spotlight,
+On macOS this adds a **Better Skill Recorder** app to `~/Applications` (relaunch from Spotlight,
 Launchpad, or the Dock). On Ubuntu it adds a matching application entry.
 
 **Windows (PowerShell)**
 
 ```powershell
-$commit="<40-character-release-commit>"; $env:SKILL_RECORDER_COMMIT=$commit; irm "https://raw.githubusercontent.com/microsoft/skill-recorder/$commit/install.ps1" | iex
+$commit="<40-character-release-commit>"; $env:SKILL_RECORDER_COMMIT=$commit; irm "https://raw.githubusercontent.com/Songhonglei/better-skill-recorder/$commit/install.ps1" | iex
 ```
 
-This adds **Skill Recorder (Source)** shortcuts to your desktop and Start Menu.
+This adds **Better Skill Recorder** shortcuts to your desktop and Start Menu.
 
 ### Then record
 
 1. **Grant Screen Recording.** On first launch, macOS asks for Screen Recording permission;
    grant it and you're ready to record.
 2. **Record, Analyze, Create.** Do your task, then Analyze. The first time you Analyze,
-   Skill Recorder offers **Sign in to Copilot** if you aren't signed in yet.
+   Better Skill Recorder offers **Sign in to Copilot** if you aren't signed in yet.
 
 To inspect the script before running it, set install options, update, or uninstall, see
 [`INSTALL.md`](INSTALL.md).
 
 > ⚠️ **Keep secrets out of your recordings.** Don't record, type, paste, or narrate
 > passwords, tokens, API keys, or other confidential info. Choosing *Analyze* sends
-> recording data to GitHub's cloud. Skill Recorder reminds you before every recording.
+> recording data to the configured provider. Better Skill Recorder reminds you before every recording.
 > Details in [What gets captured](#what-gets-captured).
 
 ---
@@ -97,7 +97,7 @@ To inspect the script before running it, set install options, update, or uninsta
 
 Recording, storage, frame extraction, and optional narration transcription all happen
 **on your computer**; nothing leaves while you record. Only when you choose **Analyze**
-does Skill Recorder send the event timeline (window/document titles, URLs, and clipboard
+does Better Skill Recorder send the event timeline (window/document titles, URLs, and clipboard
 previews), extracted screen images, and narration text to GitHub's cloud for Copilot to
 process.
 
@@ -160,7 +160,7 @@ channels.
 ## Support
 
 File bugs and feature requests through
-**[GitHub Issues](https://github.com/microsoft/skill-recorder/issues)** (search existing issues
+**[GitHub Issues](https://github.com/Songhonglei/better-skill-recorder/issues)** (search existing issues
 first to avoid duplicates). Support is limited to the resources described in
 [`SUPPORT.md`](SUPPORT.md).
 

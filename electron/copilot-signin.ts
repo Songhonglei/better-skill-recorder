@@ -47,7 +47,7 @@ function launch(file: string, args: string[], verbatim = false): void {
 
 /**
  * Open a terminal window running `login` on the Copilot CLI that ships with the app.
- * Skill Recorder installs the CLI as a dependency, so telling users to run a global
+ * Better Skill Recorder installs the CLI as a dependency, so telling users to run a global
  * `copilot` doesn't work — we hand them the bundled binary's full path instead.
  */
 export function openCopilotSignIn(): CopilotSignInResult {
@@ -55,7 +55,7 @@ export function openCopilotSignIn(): CopilotSignInResult {
   if (!cliPath) {
     return {
       ok: false,
-      error: "Skill Recorder couldn't find its bundled GitHub Copilot CLI. Reinstall the app.",
+      error: "Better Skill Recorder couldn't find its bundled GitHub Copilot CLI. Reinstall the app.",
     };
   }
   const command = copilotSignInCommand(cliPath);

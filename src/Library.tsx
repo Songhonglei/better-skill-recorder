@@ -114,7 +114,7 @@ export function Library() {
         <div className="lib-brand">
           <RecorderMark />
           <span>
-            <strong>Skill Recorder</strong>
+            <strong>Better Skill Recorder</strong>
             <small>CAPTURE → UNDERSTAND → BUILD</small>
           </span>
         </div>

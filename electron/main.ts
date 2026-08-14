@@ -19,7 +19,7 @@ import {
   createAgentRuntimeFactoryFromConfig,
   type AgentRuntimeConfiguration,
 } from "./agent-runtime/runtime-factory";
-import { AgentSettingsStore } from "./agent-runtime/settings-store";
+import { AgentSettingsStore, safeStorageIsUsable } from "./agent-runtime/settings-store";
 import { processSession } from "./pipeline";
 import { registerIpc } from "./ipc";
 import { createLogger } from "./logger";
@@ -336,9 +336,7 @@ app.whenReady().then(async () => {
       : path.join(userData, "agent-provider.json"),
     secretPath: path.join(userData, "agent-provider.secrets.json"),
     codec: {
-      available: () =>
-        safeStorage.isEncryptionAvailable() &&
-        safeStorage.getSelectedStorageBackend() !== "basic_text",
+      available: () => safeStorageIsUsable(safeStorage),
       encrypt: (value) => safeStorage.encryptString(value),
       decrypt: (value) => safeStorage.decryptString(value),
     },

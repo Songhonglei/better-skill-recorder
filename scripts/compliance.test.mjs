@@ -789,13 +789,13 @@ test("relinking instructions use platform-specific native paths", () => {
     /Contents\/Resources\/app\.asar\.unpacked\/node_modules\/@img\/sharp-libvips-darwin-arm64\/lib\/libvips-cpp\.8\.18\.3\.dylib/,
   );
   assert.match(mac, /takes no technical measure to prevent a\r?\nmodified replacement from running/);
-  assert.match(mac, /reverse engineer Skill Recorder to/);
+  assert.match(mac, /reverse engineer Better Skill Recorder to/);
   assert.match(mac, /- Sharp: 0\.35\.3/);
   assert.match(mac, /- Sharp\/libvips packaging: 1\.3\.2/);
   assert.match(mac, /- libvips: 8\.18\.3/);
 
   const linux = renderRelinking(native, { mode: "full", sources }, policy, "linux");
-  assert.match(linux, /libffmpeg\.so beside the Skill Recorder executable/);
+  assert.match(linux, /libffmpeg\.so beside the Better Skill Recorder executable/);
 });
 
 test("distributed notices match the reviewed Sharp and libvips versions", async () => {
@@ -901,7 +901,7 @@ test("source and release instructions remain compliance-preserving", async () =>
   assert.match(windowsInstaller, /\^\[0-9a-fA-F\]\{40\}\$/);
   assert.match(
     windowsInstaller,
-    /https:\/\/codeload\.github\.com\/microsoft\/skill-recorder\/zip\/\$Commit/,
+    /https:\/\/codeload\.github\.com\/Songhonglei\/better-skill-recorder\/zip\/\$Commit/,
   );
   assert.match(windowsInstaller, /https:\/\/nodejs\.org\/dist\/index\.json/);
   assert.doesNotMatch(
@@ -962,7 +962,7 @@ test("source and release instructions remain compliance-preserving", async () =>
   );
   assert.doesNotMatch(windowsInstaller, /\/(?:master|main)\/install\.ps1/i);
 
-  assert.match(windowsInstaller, /"Skill Recorder \(Source\)\.lnk"/);
+  assert.match(windowsInstaller, /"Better Skill Recorder\.lnk"/);
   assert.match(windowsInstaller, /SpecialFolder "Programs"/);
   assert.match(windowsInstaller, /SpecialFolder "DesktopDirectory"/);
   assert.match(windowsInstaller, /SKILL_RECORDER_NO_DESKTOP_SHORTCUT -ne "1"/);
@@ -976,7 +976,7 @@ test("source and release instructions remain compliance-preserving", async () =>
   assert.match(unixInstaller, /\^\[0-9a-fA-F\]\{40\}\$/);
   assert.match(
     unixInstaller,
-    /https:\/\/codeload\.github\.com\/microsoft\/skill-recorder\/tar\.gz\/\$COMMIT/,
+    /https:\/\/codeload\.github\.com\/Songhonglei\/better-skill-recorder\/tar\.gz\/\$COMMIT/,
   );
   assert.match(unixInstaller, /https:\/\/nodejs\.org\/dist\/latest-v24\.x/);
   assert.doesNotMatch(

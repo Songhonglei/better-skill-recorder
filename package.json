@@ -1,9 +1,9 @@
 {
   "name": "skill-recorder",
   "version": "0.5.0",
-  "description": "Records a user's on-screen work session and derives a structured description for building AI-agent skills.",
+  "description": "Record on-screen work and turn it into reusable AI-agent skills with a configurable model provider.",
   "author": "Skill Recorder contributors",
-  "repository": "github:microsoft/skill-recorder",
+  "repository": "github:Songhonglei/better-skill-recorder",
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -33,6 +33,7 @@
     "compliance:test": "node --test scripts/compliance.test.mjs",
     "fix:lockfile-registry": "node scripts/check-lockfile-portability.mjs --fix",
     "dist": "npm run compliance:prepare && node scripts/assert-generic-dist-platform.mjs && npm run build:vite && electron-builder --publish never",
+    "dist:app:mac": "npm run compliance:prepare && npm run build:vite && electron-builder --publish never --mac dir",
     "dist:win:x64": "npm run compliance:prepare && node scripts/assert-native-windows-arch.mjs x64 && npm run build:vite && electron-builder --config.npmRebuild=false --publish never --win nsis --x64",
     "dist:win:arm64": "npm run compliance:prepare && node scripts/assert-native-windows-arch.mjs arm64 && npm run build:vite && electron-builder --config.npmRebuild=false --publish never --win nsis --arm64",
     "dist:portable:mac": "npm run compliance:prepare && npm run build:vite && electron-builder --publish never --mac zip",
@@ -89,8 +90,8 @@
     "tesseract.js": false
   },
   "build": {
-    "appId": "com.skillrecorder.app",
-    "productName": "Skill Recorder",
+    "appId": "com.betterskillrecorder.app",
+    "productName": "Better Skill Recorder",
     "directories": {
       "output": "release"
     },
@@ -135,7 +136,7 @@
       "hardenedRuntime": false,
       "category": "public.app-category.developer-tools",
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "Skill Recorder uses your microphone only while you turn on Narrate during a recording, to transcribe your spoken narration on this computer."
+        "NSMicrophoneUsageDescription": "Better Skill Recorder uses your microphone only while you turn on Narrate during a recording, to transcribe your spoken narration on this computer."
       }
     },
     "win": {

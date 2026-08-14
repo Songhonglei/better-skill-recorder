@@ -22,7 +22,7 @@ const unpacked = readdirSync(outputRoot)
   );
 if (!unpacked) throw new Error(`Could not find the ${arch} unpacked Windows application.`);
 
-const appExe = path.join(unpacked, "Skill Recorder.exe");
+const appExe = path.join(unpacked, "Better Skill Recorder.exe");
 const expectedMachine = arch === "arm64" ? 0xaa64 : 0x8664;
 verifyPeMachine(appExe, expectedMachine);
 verifyPeMachine(path.join(unpacked, "ffmpeg.dll"), expectedMachine);

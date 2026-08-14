@@ -57,6 +57,26 @@ export interface SecretCodec {
   decrypt(value: Buffer): string;
 }
 
+export interface SafeStorageAvailability {
+  isEncryptionAvailable(): boolean;
+  getSelectedStorageBackend?: () => string;
+}
+
+/**
+ * Electron exposes getSelectedStorageBackend only on Linux at runtime. Treat
+ * Linux's basic_text fallback as unavailable, while macOS and Windows rely on
+ * their native credential stores without calling the Linux-only method.
+ */
+export function safeStorageIsUsable(
+  storage: SafeStorageAvailability,
+  platform: NodeJS.Platform = process.platform,
+): boolean {
+  if (!storage.isEncryptionAvailable()) return false;
+  if (platform !== "linux") return true;
+  return typeof storage.getSelectedStorageBackend === "function" &&
+    storage.getSelectedStorageBackend() !== "basic_text";
+}
+
 export interface AgentSettingsStoreOptions {
   configPath: string;
   secretPath: string;
