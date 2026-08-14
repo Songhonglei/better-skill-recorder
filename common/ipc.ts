@@ -11,6 +11,13 @@ import type {
   TargetPlacement,
 } from "./skill";
 import type { RecorderState } from "./types";
+import type {
+  AgentProviderRevealResult,
+  AgentProviderSettings,
+  AgentProviderSettingsInput,
+  AgentProviderSettingsResult,
+  AgentProviderTestResult,
+} from "./provider-settings";
 
 export type {
   SensitiveCategory,
@@ -476,6 +483,12 @@ export const IPC = {
   closeLibrary: "ui:close-library",
   recordingControlsExpanded: "ui:recording-controls-expanded",
   fitRecorderHeight: "ui:fit-recorder-height",
+  agentSettings: "agent-settings:get",
+  agentSettingsSave: "agent-settings:save",
+  agentSettingsTest: "agent-settings:test",
+  agentSettingsReload: "agent-settings:reload",
+  agentSettingsReveal: "agent-settings:reveal",
+  agentSettingsChanged: "agent-settings:changed",
 } as const;
 
 /** Shape exposed on `window.skillRecorder` by the preload bridge. */
@@ -598,4 +611,14 @@ export interface SkillRecorderApi {
   /** Fit the compact recorder window to its rendered content height (fire-and-forget)
    *  so the fixed-width HUD never shows dead space or clips a revealed row. */
   fitRecorderHeight(height: number): void;
+  /** Effective provider settings. API-key material is never returned to the renderer. */
+  agentSettings(): Promise<AgentProviderSettings>;
+  /** Persist and activate provider settings without restarting the app. */
+  saveAgentSettings(input: AgentProviderSettingsInput): Promise<AgentProviderSettingsResult>;
+  /** Make a real, minimal provider/tool call without changing the active configuration. */
+  testAgentSettings(input: AgentProviderSettingsInput): Promise<AgentProviderTestResult>;
+  /** Re-read a hand-edited configuration file and activate it. */
+  reloadAgentSettings(): Promise<AgentProviderSettingsResult>;
+  revealAgentSettings(): Promise<AgentProviderRevealResult>;
+  onAgentSettingsChanged(cb: (settings: AgentProviderSettings) => void): () => void;
 }

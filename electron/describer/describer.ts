@@ -96,8 +96,26 @@ export class Describer {
 
   constructor(
     private readonly emitProgress: (p: AnalyzeProgress) => void,
-    private readonly runtime: AgentRuntime = new CopilotAgentRuntime("Describer"),
+    private runtime: AgentRuntime = new CopilotAgentRuntime("Describer"),
   ) {}
+
+  isBusy(): boolean {
+    return this.active.size > 0;
+  }
+
+  /** Apply a provider change without restarting the app. Old conversations are discarded. */
+  async replaceRuntime(runtime: AgentRuntime): Promise<void> {
+    if (this.isBusy()) {
+      await runtime.dispose().catch(() => undefined);
+      throw new Error("Wait for the current analysis to finish before changing models.");
+    }
+    const previous = this.runtime;
+    for (const [id] of this.live) await this.disposeLive(id);
+    this.runtime = runtime;
+    this.runtimeReady = null;
+    this.model = undefined;
+    await previous.dispose().catch(() => undefined);
+  }
 
   /** First pass: reconstruct the session from scratch. */
   async analyze(sessionId: string, redaction?: RedactionContext): Promise<Analysis> {

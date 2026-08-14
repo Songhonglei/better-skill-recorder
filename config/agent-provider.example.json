@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "provider": "openai-compatible",
+  "openaiCompatible": {
+    "baseUrl": "https://api.example.com/v1",
+    "model": "your-vision-model",
+    "vision": true,
+    "apiKeyEnv": "MY_SKILL_RECORDER_API_KEY"
+  }
+}

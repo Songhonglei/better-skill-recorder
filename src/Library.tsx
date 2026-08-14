@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { Analysis, AnalysisStep } from "../common/analysis";
+import type { AgentProviderSettings } from "../common/provider-settings";
 import type {
   AnalyzeProgress,
   AutomationBuildProgress,
@@ -40,13 +41,24 @@ import {
 import { formatBytes, formatDur, formatWhen, shortLabel } from "./format";
 import { skillPlacementModel, skillTargetFor } from "./skill-placement";
 import { SensitiveReview } from "./SensitiveReview";
+import { ProviderSettings } from "./ProviderSettings";
+
+type LibraryView = "sessions" | "model";
+
+const RecorderMark = () => (
+  <span className="lib-mark" aria-hidden>
+    <i /><i /><i />
+  </span>
+);
 
 export function Library() {
+  const [view, setView] = useState<LibraryView>("sessions");
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [narrationStatus, setNarrationStatus] = useState<NarrationStatus | null>(null);
+  const [providerSettings, setProviderSettings] = useState<AgentProviderSettings | null>(null);
 
   const loadSessions = useCallback(async () => {
     const list = await window.skillRecorder.listSessions();
@@ -69,6 +81,11 @@ export function Library() {
       if (next.phase === "idle") void loadSessions();
     });
   }, [loadSessions]);
+
+  useEffect(() => {
+    void window.skillRecorder.agentSettings().then(setProviderSettings);
+    return window.skillRecorder.onAgentSettingsChanged(setProviderSettings);
+  }, []);
 
   const deleteSession = useCallback(async (id: string) => {
     setNotice(null);
@@ -94,27 +111,65 @@ export function Library() {
   return (
     <div className="lib">
       <aside className="lib-list">
-        <div className="lib-list-head">
-          <span className="eyebrow">Sessions</span>
-          <span className="pill">{sessions.length}</span>
+        <div className="lib-brand">
+          <RecorderMark />
+          <span>
+            <strong>Skill Recorder</strong>
+            <small>CAPTURE → UNDERSTAND → BUILD</small>
+          </span>
         </div>
-        {notice && (
-          <button className="sess-notice" onClick={() => setNotice(null)} title="Dismiss">
-            {notice}
+        <nav className="lib-nav" aria-label="Library sections">
+          <button className={view === "sessions" ? "active" : ""} onClick={() => setView("sessions")}>
+            <span className="lib-nav-icon" aria-hidden>◫</span>
+            Recordings
+            <span className="lib-nav-count">{sessions.length}</span>
           </button>
+          <button className={view === "model" ? "active" : ""} onClick={() => setView("model")}>
+            <span className="lib-nav-icon model" aria-hidden>✦</span>
+            Model control
+            <span className={`lib-nav-signal ${providerSettings?.provider === "openai-compatible" ? "custom" : ""}`} aria-hidden />
+          </button>
+        </nav>
+        <div className="lib-divider" />
+        {view === "sessions" && (
+          <>
+            <div className="lib-list-head">
+              <span className="eyebrow">RECENT SESSIONS</span>
+              <span className="pill">{sessions.length}</span>
+            </div>
+            {notice && (
+              <button className="sess-notice" onClick={() => setNotice(null)} title="Dismiss">
+                {notice}
+              </button>
+            )}
+            <div className="lib-list-scroll">
+              <SessionsList
+                sessions={sessions}
+                loaded={loaded}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+                onDelete={deleteSession}
+              />
+            </div>
+          </>
         )}
-        <div className="lib-list-scroll">
-          <SessionsList
-            sessions={sessions}
-            loaded={loaded}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            onDelete={deleteSession}
-          />
+        <div className="lib-runtime-card">
+          <span className={`lib-runtime-dot ${providerSettings?.provider === "openai-compatible" ? "custom" : ""}`} />
+          <span>
+            <small>ACTIVE MODEL</small>
+            <strong>
+              {providerSettings?.provider === "openai-compatible"
+                ? providerSettings.model || "Custom endpoint"
+                : "GitHub Copilot"}
+            </strong>
+          </span>
+          <button type="button" onClick={() => setView("model")} aria-label="Open model settings">›</button>
         </div>
       </aside>
       <main className="lib-detail">
-        {selected ? (
+        {view === "model" ? (
+          <ProviderSettings initial={providerSettings} onChanged={setProviderSettings} />
+        ) : selected ? (
           <AnalysisWorkspace
             key={selected.id}
             summary={selected}

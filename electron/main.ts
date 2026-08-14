@@ -1,11 +1,25 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, Menu, screen } from "electron";
+import {
+  app,
+  BrowserWindow,
+  globalShortcut,
+  ipcMain,
+  Menu,
+  safeStorage,
+  screen,
+  shell,
+} from "electron";
+import path from "node:path";
 
 import { FULL_CAPTURE } from "../common/config";
 import { IPC, type RecorderStatus, type StartResult } from "../common/ipc";
 import { createCollectors } from "./collectors";
 import { installCrashGuards } from "./crash-guards";
 import { Describer } from "./describer/describer";
-import { createAgentRuntimeFactory } from "./agent-runtime/runtime-factory";
+import {
+  createAgentRuntimeFactoryFromConfig,
+  type AgentRuntimeConfiguration,
+} from "./agent-runtime/runtime-factory";
+import { AgentSettingsStore } from "./agent-runtime/settings-store";
 import { processSession } from "./pipeline";
 import { registerIpc } from "./ipc";
 import { createLogger } from "./logger";
@@ -48,6 +62,11 @@ let controlsExpanded = false;
 let quitReady = false;
 let quitTask: Promise<void> | null = null;
 let recordingStartPending = false;
+let providerChangePending = false;
+let agentSettings: AgentSettingsStore | null = null;
+let describer: Describer;
+let builder: SkillBuilder;
+let automationBuilder: AutomationBuilder;
 const recordingPrivacy = new RecordingPrivacySession();
 const narration = new NarrationManager((status) =>
   broadcast(IPC.narrationStatusChanged, status),
@@ -105,19 +124,88 @@ function broadcast(channel: string, payload: unknown): void {
   }
 }
 
-const agentRuntimes = createAgentRuntimeFactory();
-const describer = new Describer(
-  (progress) => broadcast(IPC.analyzeProgress, progress),
-  agentRuntimes.create("Describer"),
-);
-const builder = new SkillBuilder(
-  (progress) => broadcast(IPC.skillProgress, progress),
-  agentRuntimes.create("SkillBuilder"),
-);
-const automationBuilder = new AutomationBuilder(
-  (progress) => broadcast(IPC.automationProgress, progress),
-  agentRuntimes.create("AutomationBuilder"),
-);
+function agentWorkIsBusy(): boolean {
+  return describer?.isBusy() || builder?.isBusy() || automationBuilder?.isBusy() || false;
+}
+
+async function applyAgentConfiguration(config: AgentRuntimeConfiguration): Promise<void> {
+  if (providerChangePending) throw new Error("A model change is already in progress.");
+  if (agentWorkIsBusy()) {
+    throw new Error("Wait for the current analysis or build to finish before changing models.");
+  }
+  providerChangePending = true;
+  const runtimes = createAgentRuntimeFactoryFromConfig(config);
+  try {
+    await Promise.all([
+      describer.replaceRuntime(runtimes.create("Describer")),
+      builder.replaceRuntime(runtimes.create("SkillBuilder")),
+      automationBuilder.replaceRuntime(runtimes.create("AutomationBuilder")),
+    ]);
+  } finally {
+    providerChangePending = false;
+  }
+}
+
+async function testAgentConfiguration(config: AgentRuntimeConfiguration): Promise<string> {
+  const factory = createAgentRuntimeFactoryFromConfig(config);
+  const runtime = factory.create("SettingsProbe");
+  try {
+    await runtime.checkConnection();
+    if (runtime.id === "copilot") return "Copilot is ready.";
+    let called = false;
+    const vision = runtime.capabilities.vision;
+    const session = await runtime.createSession({
+      systemInstructions:
+        vision
+          ? "This is a connection test. First call provider_probe_image by itself. After the image result arrives, call provider_probe_done. Return no prose."
+          : "This is a connection test. You must call provider_probe_done exactly once and return no prose.",
+      tools: [
+        ...(vision ? [{
+          name: "provider_probe_image",
+          description: "Return a harmless one-pixel PNG to verify image tool-result transport.",
+          parameters: { type: "object", properties: {}, additionalProperties: false },
+          handler: () => ({
+            resultType: "success" as const,
+            textResultForLlm: "The visual transport probe is attached. Call provider_probe_done now.",
+            binaryResultsForLlm: [{
+              type: "image" as const,
+              mimeType: "image/png",
+              data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z4xQAAAAASUVORK5CYII=",
+            }],
+          }),
+        }] : []),
+        {
+          name: "provider_probe_done",
+          description: "Confirm that OpenAI-compatible function calling works.",
+          parameters: { type: "object", properties: {}, additionalProperties: false },
+          completesRun: true,
+          handler: () => {
+            called = true;
+            return "Connection and tool calling confirmed.";
+          },
+        },
+      ],
+    });
+    try {
+      await session.run(
+        vision
+          ? "Run the two-stage tool and visual transport probe now."
+          : "Call provider_probe_done now.",
+        { timeoutMs: 30_000 },
+      );
+    } finally {
+      await session.dispose().catch(() => undefined);
+    }
+    if (!called) {
+      throw new Error("The endpoint replied, but the model did not call the required tool.");
+    }
+    return vision
+      ? "Endpoint, authentication, tool calling, and image transport are ready."
+      : "Endpoint, model, authentication, and tool calling are ready.";
+  } finally {
+    await runtime.dispose().catch(() => undefined);
+  }
+}
 
 /** Open, focus, and re-dock the Sessions library window (creating it lazily). */
 function openLibrary(): void {
@@ -240,6 +328,37 @@ app.whenReady().then(async () => {
   if (process.platform === "win32") Menu.setApplicationMenu(null);
   if (dock && app.dock) app.dock.setIcon(dock);
 
+  const userData = app.getPath("userData");
+  const configuredPath = process.env.SKILL_RECORDER_CONFIG_FILE?.trim();
+  agentSettings = new AgentSettingsStore({
+    configPath: configuredPath
+      ? path.resolve(configuredPath)
+      : path.join(userData, "agent-provider.json"),
+    secretPath: path.join(userData, "agent-provider.secrets.json"),
+    codec: {
+      available: () =>
+        safeStorage.isEncryptionAvailable() &&
+        safeStorage.getSelectedStorageBackend() !== "basic_text",
+      encrypt: (value) => safeStorage.encryptString(value),
+      decrypt: (value) => safeStorage.decryptString(value),
+    },
+  });
+  const agentRuntimes = createAgentRuntimeFactoryFromConfig(
+    agentSettings.runtimeConfiguration(),
+  );
+  describer = new Describer(
+    (progress) => broadcast(IPC.analyzeProgress, progress),
+    agentRuntimes.create("Describer"),
+  );
+  builder = new SkillBuilder(
+    (progress) => broadcast(IPC.skillProgress, progress),
+    agentRuntimes.create("SkillBuilder"),
+  );
+  automationBuilder = new AutomationBuilder(
+    (progress) => broadcast(IPC.automationProgress, progress),
+    agentRuntimes.create("AutomationBuilder"),
+  );
+
   narration.initialize();
   try {
     await microphones.initialize();
@@ -303,6 +422,64 @@ app.whenReady().then(async () => {
       return;
     }
     fitRecorderHeight(win, height);
+  });
+
+  ipcMain.handle(IPC.agentSettings, () => agentSettings!.snapshot());
+  ipcMain.handle(IPC.agentSettingsSave, async (_event, input) => {
+    try {
+      if (providerChangePending || agentWorkIsBusy()) {
+        throw new Error("Wait for the current analysis or build to finish before changing models.");
+      }
+      agentSettings!.preview(input);
+      const settings = agentSettings!.save(input);
+      await applyAgentConfiguration(agentSettings!.runtimeConfiguration());
+      broadcast(IPC.agentSettingsChanged, settings);
+      return { ok: true, settings };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle(IPC.agentSettingsTest, async (_event, input) => {
+    const startedAt = Date.now();
+    try {
+      const message = await testAgentConfiguration(agentSettings!.preview(input));
+      return { ok: true, message, latencyMs: Date.now() - startedAt };
+    } catch (error) {
+      return {
+        ok: false,
+        message: error instanceof Error ? error.message : String(error),
+        latencyMs: Date.now() - startedAt,
+      };
+    }
+  });
+  ipcMain.handle(IPC.agentSettingsReload, async () => {
+    try {
+      if (providerChangePending || agentWorkIsBusy()) {
+        throw new Error("Wait for the current analysis or build to finish before changing models.");
+      }
+      const settings = agentSettings!.reload();
+      if (settings.configError) throw new Error(settings.configError);
+      await applyAgentConfiguration(agentSettings!.runtimeConfiguration());
+      broadcast(IPC.agentSettingsChanged, settings);
+      return { ok: true, settings };
+    } catch (error) {
+      return {
+        ok: false,
+        settings: agentSettings!.snapshot(),
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  });
+  ipcMain.handle(IPC.agentSettingsReveal, async () => {
+    try {
+      const configPath = agentSettings!.snapshot().configPath;
+      if (await shell.openPath(path.dirname(configPath))) {
+        throw new Error("Could not open the configuration folder.");
+      }
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
   });
 
   recorder.onStatusChanged((status) => {

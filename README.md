@@ -28,8 +28,9 @@ form can teach the agent to submit *all* of them.
 2. 🎛️ **Control.** While recording, a small always-on-top bar shows capture and
    microphone state. Mute, unmute, or switch mics on the fly, then finish, or discard
    (with a confirmation) if the take didn't go to plan.
-3. 🧠 **Analyze.** Click Analyze and GitHub Copilot reconstructs one overall intent and
-   an ordered list of steps. Review and edit until it reads right.
+3. 🧠 **Analyze.** Click Analyze and GitHub Copilot—or your configured
+   OpenAI-compatible model—reconstructs one overall intent and an ordered list of
+   steps. Review and edit until it reads right.
 4. ✨ **Create.** From an approved analysis, generate a reusable **Skill** and/or a
    scheduled **Automation**.
 
@@ -146,6 +147,8 @@ npm run eval:builder    # score the skill/automation generalization
   uninstalling, and manual developer setup.
 - **[RELEASING.md](RELEASING.md):** maintainer release runbook.
 - **[evals/README.md](evals/README.md):** the describer / builder eval harness.
+- **[docs/MODEL_CONFIGURATION.md](docs/MODEL_CONFIGURATION.md):** custom endpoint UI,
+  JSON configuration, secure API-key storage, precedence, and endpoint requirements.
 - **[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md):** licenses for bundled dependencies.
 
 ## Security

@@ -1,4 +1,4 @@
-# OpenAI-compatible source preview (Phases 2–3)
+# OpenAI-compatible provider (Phases 2–4)
 
 Phase 2 added text-only Analyze and feedback. Phase 3 adds default-on frame/image
 analysis plus Skill Builder and Automation Builder through the same OpenAI-compatible
@@ -6,10 +6,15 @@ Chat Completions endpoint. GitHub Copilot remains the default. The installed
 `Skill Recorder (Source)` launcher is unchanged and continues to run the official
 Microsoft revision until the fork is installed explicitly.
 
-## Temporary configuration
+## Configuration
 
-There is intentionally no Settings UI or persisted credential in this preview. Start
-the fork from this source checkout with these process-only values:
+Phase 4 adds the **Sessions → Model control** UI, JSON configuration, encrypted API-key
+storage, connection/tool testing, and no-restart provider activation. See
+[`MODEL_CONFIGURATION.md`](MODEL_CONFIGURATION.md).
+
+The process-only bridge remains available for CI, local experiments, and overrides:
+
+Start the fork from this source checkout with these process-only values:
 
 ```bash
 export SKILL_RECORDER_AGENT_PROVIDER=openai-compatible
@@ -53,10 +58,9 @@ Supported:
 - cancellation, total-run deadline, and session disposal; and
 - exact tool allowlisting.
 
-Deferred to later phases:
+Still deferred:
 
-- Settings UI and OS credential storage;
-- endpoint capability probing; and
+- general endpoint capability discovery; and
 - Responses API support.
 
 To return to Copilot, unset `SKILL_RECORDER_AGENT_PROVIDER` (and the optional

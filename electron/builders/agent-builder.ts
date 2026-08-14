@@ -29,13 +29,31 @@ export abstract class AgentBuilder<TLive extends BaseLive> {
 
   constructor(
     name: string,
-    private readonly runtime: AgentRuntime = new CopilotAgentRuntime(name),
+    private runtime: AgentRuntime = new CopilotAgentRuntime(name),
   ) {
     this.log = createLogger(name);
   }
 
   isBuilding(sessionId: string): boolean {
     return this.active.has(sessionId);
+  }
+
+  isBusy(): boolean {
+    return this.active.size > 0;
+  }
+
+  /** Apply a provider change without carrying old plan conversations across models. */
+  async replaceRuntime(runtime: AgentRuntime): Promise<void> {
+    if (this.isBusy()) {
+      await runtime.dispose().catch(() => undefined);
+      throw new Error("Wait for the current build to finish before changing models.");
+    }
+    const previous = this.runtime;
+    for (const [id] of this.live) await this.disposeLive(id);
+    this.runtime = runtime;
+    this.runtimeReady = null;
+    this.model = undefined;
+    await previous.dispose().catch(() => undefined);
   }
 
   async cancel(sessionId: string): Promise<void> {
@@ -93,7 +111,9 @@ export abstract class AgentBuilder<TLive extends BaseLive> {
     if (this.runtimeReady) return this.runtimeReady;
     this.runtimeReady = (async () => {
       const status = await this.runtime.checkConnection();
-      this.model = process.env.SKILL_RECORDER_MODEL || undefined;
+      this.model = this.runtime.id === "copilot"
+        ? process.env.SKILL_RECORDER_MODEL || undefined
+        : (await this.runtime.listModels?.())?.find((candidate) => candidate.enabled)?.id;
       this.log.info(
         `${this.runtime.id} ready`,
         status.login ? `as ${status.login}` : "",

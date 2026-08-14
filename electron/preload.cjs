@@ -57,6 +57,12 @@ const IPC = {
   closeLibrary: "ui:close-library",
   recordingControlsExpanded: "ui:recording-controls-expanded",
   fitRecorderHeight: "ui:fit-recorder-height",
+  agentSettings: "agent-settings:get",
+  agentSettingsSave: "agent-settings:save",
+  agentSettingsTest: "agent-settings:test",
+  agentSettingsReload: "agent-settings:reload",
+  agentSettingsReveal: "agent-settings:reveal",
+  agentSettingsChanged: "agent-settings:changed",
 };
 
 let recordingPrivacyWarningPending = false;
@@ -166,4 +172,14 @@ contextBridge.exposeInMainWorld("skillRecorder", {
   setRecordingControlsExpanded: (expanded) =>
     ipcRenderer.invoke(IPC.recordingControlsExpanded, expanded),
   fitRecorderHeight: (height) => ipcRenderer.send(IPC.fitRecorderHeight, height),
+  agentSettings: () => ipcRenderer.invoke(IPC.agentSettings),
+  saveAgentSettings: (input) => ipcRenderer.invoke(IPC.agentSettingsSave, input),
+  testAgentSettings: (input) => ipcRenderer.invoke(IPC.agentSettingsTest, input),
+  reloadAgentSettings: () => ipcRenderer.invoke(IPC.agentSettingsReload),
+  revealAgentSettings: () => ipcRenderer.invoke(IPC.agentSettingsReveal),
+  onAgentSettingsChanged: (cb) => {
+    const listener = (_event, settings) => cb(settings);
+    ipcRenderer.on(IPC.agentSettingsChanged, listener);
+    return () => ipcRenderer.removeListener(IPC.agentSettingsChanged, listener);
+  },
 });

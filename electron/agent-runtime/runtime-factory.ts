@@ -15,6 +15,16 @@ export interface AgentRuntimeFactory {
   create(label: string): AgentRuntime;
 }
 
+export type AgentRuntimeConfiguration =
+  | { readonly provider: "copilot" }
+  | {
+      readonly provider: "openai-compatible";
+      readonly baseUrl: string;
+      readonly apiKey?: string;
+      readonly model: string;
+      readonly supportsVision: boolean;
+    };
+
 function visionEnabled(raw: string | undefined): boolean {
   const value = raw?.trim().toLowerCase();
   if (!value) return true;
@@ -24,9 +34,10 @@ function visionEnabled(raw: string | undefined): boolean {
 }
 
 /**
- * Preview configuration bridge. The API key is read once into this in-memory factory and
- * removed from the process environment, so it is never persisted by the app.
- * Phase 4 replaces this with Settings + OS credential storage.
+ * Process-only compatibility bridge. The API key is read once into this in-memory
+ * factory and removed from the process environment. The app's normal path uses
+ * AgentSettingsStore + createAgentRuntimeFactoryFromConfig; tests and scripted launches
+ * keep using this helper.
  */
 export function createAgentRuntimeFactory(
   env: NodeJS.ProcessEnv = process.env,
@@ -53,6 +64,22 @@ export function createAgentRuntimeFactory(
     model: env[OPENAI_COMPATIBLE_ENV.model] ?? "",
     supportsVision: visionEnabled(env[OPENAI_COMPATIBLE_ENV.vision]),
   };
+  return createAgentRuntimeFactoryFromConfig({
+    provider: "openai-compatible",
+    ...config,
+  });
+}
+
+/** Build a runtime factory from persisted/UI settings rather than process state. */
+export function createAgentRuntimeFactoryFromConfig(
+  config: AgentRuntimeConfiguration,
+): AgentRuntimeFactory {
+  if (config.provider === "copilot") {
+    return {
+      provider: "copilot",
+      create: (label) => new CopilotAgentRuntime(label),
+    };
+  }
   return {
     provider: "openai-compatible",
     create: () => new OpenAICompatibleRuntime(config),
