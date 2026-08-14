@@ -150,6 +150,52 @@ test("OpenAI-compatible runtime allows two JSON/schema repair attempts", async (
   assert.equal(thirdBody.messages.at(-1)?.content, "intent must be a string");
 });
 
+test("vision-enabled runtime forwards inline image tool results to the next model turn", async () => {
+  const requests: RequestInit[] = [];
+  const runtime = new OpenAICompatibleRuntime(
+    {
+      baseUrl: "https://llm.example.test/v1",
+      model: "vision-model",
+      supportsVision: true,
+    },
+    scriptedFetch(
+      [
+        assistant([{ id: "frames-1", name: "get_frames", arguments: "{}" }]),
+        assistant([{ id: "submit-1", name: "submit", arguments: "{}" }]),
+      ],
+      requests,
+    ),
+  );
+  const session = await runtime.createSession({
+    systemInstructions: "Inspect frames.",
+    tools: [
+      tool("get_frames", () => ({
+        textResultForLlm: "One frame at 1.0s",
+        binaryResultsForLlm: [
+          { data: "aGVsbG8=", mimeType: "image/jpeg", type: "image" },
+        ],
+        resultType: "success",
+      })),
+      tool("submit", () => "done", true),
+    ],
+  });
+
+  await session.run("Analyze", { timeoutMs: 5_000 });
+  assert.deepEqual(runtime.capabilities, { vision: true });
+  const secondBody = JSON.parse(String(requests[1].body)) as {
+    messages: Array<{ role: string; content: unknown }>;
+  };
+  const imageMessage = secondBody.messages.at(-1);
+  assert.equal(imageMessage?.role, "user");
+  assert.deepEqual(imageMessage?.content, [
+    { type: "text", text: "Images returned by tool get_frames for call frames-1:" },
+    {
+      type: "image_url",
+      image_url: { url: "data:image/jpeg;base64,aGVsbG8=", detail: "auto" },
+    },
+  ]);
+});
+
 test("OpenAI-compatible runtime fails closed on an unknown tool", async () => {
   let allowedCalls = 0;
   const runtime = new OpenAICompatibleRuntime(

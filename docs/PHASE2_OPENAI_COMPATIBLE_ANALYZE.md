@@ -1,6 +1,7 @@
-# Phase 2: OpenAI-compatible Analyze preview
+# OpenAI-compatible source preview (Phases 2–3)
 
-Phase 2 adds a text-only Analyze and feedback path through an OpenAI-compatible
+Phase 2 added text-only Analyze and feedback. Phase 3 adds opt-in frame/image
+analysis plus Skill Builder and Automation Builder through the same OpenAI-compatible
 Chat Completions endpoint. GitHub Copilot remains the default. The installed
 `Skill Recorder (Source)` launcher is unchanged and continues to run the official
 Microsoft revision until the fork is installed explicitly.
@@ -14,6 +15,8 @@ the fork from this source checkout with these process-only values:
 export SKILL_RECORDER_AGENT_PROVIDER=openai-compatible
 export SKILL_RECORDER_OPENAI_BASE_URL=https://your-endpoint.example/v1
 export SKILL_RECORDER_MODEL=your-model
+# Set this only when the selected model accepts image_url inputs:
+export SKILL_RECORDER_OPENAI_VISION=true
 read -s SKILL_RECORDER_OPENAI_API_KEY
 export SKILL_RECORDER_OPENAI_API_KEY
 npm start
@@ -29,12 +32,19 @@ own process environment. It is not written to application data, recordings,
 logs, debug bundles, or repository files. The parent shell still owns any shell
 variable it exported, so unset it after the app exits as shown above.
 
-## Phase 2 scope
+`SKILL_RECORDER_OPENAI_VISION` defaults to false. When true, Analyze may call
+`get_frames`; returned JPEGs are attached to the next Chat Completions turn as
+inline `image_url` data. Leave it unset for text-only models.
+
+## Current preview scope
 
 Supported:
 
 - initial recording Analyze;
 - feedback in the same multi-turn conversation;
+- optional screen-frame analysis for explicitly vision-enabled models;
+- Skill plan proposal, refinement, and final `SKILL.md` generation;
+- Automation plan proposal, refinement, and deterministic export;
 - Chat Completions function/tool calling;
 - sequential text tool results;
 - validated `submit_analysis` completion and two repair attempts;
@@ -43,11 +53,9 @@ Supported:
 
 Deferred to later phases:
 
-- frame/image analysis;
-- Skill Builder and Automation Builder custom-provider support;
 - Settings UI and OS credential storage;
 - endpoint capability probing; and
 - Responses API support.
 
-To return to Copilot, unset `SKILL_RECORDER_AGENT_PROVIDER` or set it to
-`copilot` before launching the fork.
+To return to Copilot, unset `SKILL_RECORDER_AGENT_PROVIDER` (and the optional
+vision flag) or set the provider to `copilot` before launching the fork.

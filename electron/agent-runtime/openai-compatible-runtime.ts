@@ -12,6 +12,10 @@ import type {
 const DEFAULT_MAX_TURNS = 16;
 const DEFAULT_MAX_TOOL_CALLS = 8;
 const DEFAULT_REPAIR_ATTEMPTS = 2;
+const MAX_IMAGES_PER_TOOL_RESULT = 8;
+const MAX_IMAGE_BASE64_CHARS = 10 * 1024 * 1024;
+const MAX_TOTAL_IMAGE_BASE64_CHARS = 24 * 1024 * 1024;
+const SUPPORTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 export interface OpenAICompatibleRuntimeConfig {
   /** API root such as https://example.com/v1 or http://127.0.0.1:1234/v1. */
@@ -19,6 +23,8 @@ export interface OpenAICompatibleRuntimeConfig {
   /** Held only by the runtime. Empty is allowed for local endpoints without auth. */
   apiKey?: string;
   model: string;
+  /** Explicit opt-in; false unless the configured model is known to accept images. */
+  supportsVision?: boolean;
   maxTurns?: number;
   maxToolCallsPerTurn?: number;
   maxRepairAttempts?: number;
@@ -32,8 +38,13 @@ interface ChatToolCall {
   function: { name: string; arguments: string };
 }
 
+type ChatUserContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string; detail: "auto" } };
+
 type ChatMessage =
-  | { role: "system" | "user"; content: string }
+  | { role: "system"; content: string }
+  | { role: "user"; content: string | ChatUserContentPart[] }
   | { role: "assistant"; content: string | null; tool_calls?: ChatToolCall[] }
   | { role: "tool"; tool_call_id: string; content: string };
 
@@ -156,20 +167,49 @@ function parseAssistantMessage(payload: unknown): Extract<ChatMessage, { role: "
   };
 }
 
-function toolResultContent(result: AgentToolResult): {
+function toolResultContent(result: AgentToolResult, supportsVision: boolean): {
   content: string;
   success: boolean;
+  images: ChatUserContentPart[];
 } {
-  if (typeof result === "string") return { content: result, success: true };
-  if (result.binaryResultsForLlm?.length) {
+  if (typeof result === "string") return { content: result, success: true, images: [] };
+  const binary = result.binaryResultsForLlm ?? [];
+  if (binary.length && !supportsVision) {
     throw runtimeError(
-      "This OpenAI-compatible Analyze MVP does not support image tool results.",
+      "The configured OpenAI-compatible model is not enabled for image tool results.",
       "tool_failed",
     );
   }
+  if (binary.length > MAX_IMAGES_PER_TOOL_RESULT) {
+    throw runtimeError(
+      `A tool returned too many images (maximum ${MAX_IMAGES_PER_TOOL_RESULT}).`,
+      "tool_failed",
+    );
+  }
+  if (binary.reduce((total, item) => total + item.data.length, 0) > MAX_TOTAL_IMAGE_BASE64_CHARS) {
+    throw runtimeError("A tool returned an oversized image payload.", "tool_failed");
+  }
+  const images = binary.map((item) => {
+    if (
+      item.type !== "image" ||
+      !SUPPORTED_IMAGE_TYPES.has(item.mimeType) ||
+      !item.data ||
+      item.data.length > MAX_IMAGE_BASE64_CHARS
+    ) {
+      throw runtimeError("A tool returned an unsupported or oversized image.", "tool_failed");
+    }
+    return {
+      type: "image_url" as const,
+      image_url: {
+        url: `data:${item.mimeType};base64,${item.data}`,
+        detail: "auto" as const,
+      },
+    };
+  });
   return {
     content: result.textResultForLlm,
     success: result.resultType === "success",
+    images,
   };
 }
 
@@ -184,6 +224,7 @@ class OpenAICompatibleSession implements AgentSession {
     private readonly apiKey: string | undefined,
     private readonly model: string,
     private readonly tools: AgentTool[],
+    private readonly supportsVision: boolean,
     systemInstructions: string,
     private readonly fetcher: AgentFetch,
     private readonly limits: {
@@ -268,7 +309,8 @@ class OpenAICompatibleSession implements AgentSession {
         );
       }
 
-      // Phase 2 deliberately serializes tool execution for deterministic ordering.
+      // The compatible runtime deliberately serializes tool execution for deterministic ordering.
+      const imageParts: ChatUserContentPart[] = [];
       for (const call of calls) {
         active.controller.signal.throwIfAborted();
         const tool = this.toolsByName.get(call.function.name);
@@ -294,14 +336,15 @@ class OpenAICompatibleSession implements AgentSession {
           continue;
         }
 
-        let converted: { content: string; success: boolean };
+        let converted: { content: string; success: boolean; images: ChatUserContentPart[] };
         try {
-          converted = toolResultContent(await tool.handler(args));
+          converted = toolResultContent(await tool.handler(args), this.supportsVision);
         } catch (error) {
           if (error instanceof AgentRuntimeError) throw error;
           converted = {
             content: "Tool execution failed. Correct the arguments and try again.",
             success: false,
+            images: [],
           };
         }
         active.controller.signal.throwIfAborted();
@@ -315,7 +358,20 @@ class OpenAICompatibleSession implements AgentSession {
           content: converted.content,
         });
         if (converted.success && tool.completesRun) return;
+        if (converted.images.length) {
+          imageParts.push(
+            {
+              type: "text",
+              text: `Images returned by tool ${tool.name} for call ${call.id}:`,
+            },
+            ...converted.images,
+          );
+        }
       }
+      // Chat Completions does not portably accept image parts on a `tool` role.
+      // Pair every call with its text tool result first, then add one user message
+      // containing the inline images before the next assistant turn.
+      if (imageParts.length) this.history.push({ role: "user", content: imageParts });
     }
     throw runtimeError(
       `OpenAI-compatible agent exceeded ${this.limits.maxTurns} model turns.`,
@@ -385,16 +441,18 @@ class OpenAICompatibleSession implements AgentSession {
   }
 }
 
-/** OpenAI-compatible Chat Completions adapter used by the Phase 2 Analyze MVP. */
+/** OpenAI-compatible Chat Completions adapter shared by Analyze and both builders. */
 export class OpenAICompatibleRuntime implements AgentRuntime {
   readonly id = "openai-compatible" as const;
-  readonly capabilities = { vision: false } as const;
+  readonly capabilities: { readonly vision: boolean };
   private readonly sessions = new Set<OpenAICompatibleSession>();
 
   constructor(
     private readonly config: OpenAICompatibleRuntimeConfig,
     private readonly fetcher: AgentFetch = globalThis.fetch.bind(globalThis),
-  ) {}
+  ) {
+    this.capabilities = { vision: config.supportsVision === true };
+  }
 
   async checkConnection(signal?: AbortSignal): Promise<AgentConnectionStatus> {
     signal?.throwIfAborted();
@@ -404,7 +462,11 @@ export class OpenAICompatibleRuntime implements AgentRuntime {
 
   async listModels(signal?: AbortSignal): Promise<AgentModelInfo[]> {
     await this.checkConnection(signal);
-    return [{ id: this.config.model.trim(), enabled: true, supportsVision: false }];
+    return [{
+      id: this.config.model.trim(),
+      enabled: true,
+      supportsVision: this.capabilities.vision,
+    }];
   }
 
   async createSession(options: AgentSessionOptions): Promise<AgentSession> {
@@ -415,6 +477,7 @@ export class OpenAICompatibleRuntime implements AgentRuntime {
       this.config.apiKey,
       options.model?.trim() || this.config.model.trim(),
       [...options.tools],
+      this.capabilities.vision,
       options.systemInstructions,
       this.fetcher,
       {

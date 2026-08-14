@@ -5,7 +5,7 @@ import { IPC, type RecorderStatus, type StartResult } from "../common/ipc";
 import { createCollectors } from "./collectors";
 import { installCrashGuards } from "./crash-guards";
 import { Describer } from "./describer/describer";
-import { createAnalyzeRuntime } from "./agent-runtime/runtime-factory";
+import { createAgentRuntimeFactory } from "./agent-runtime/runtime-factory";
 import { processSession } from "./pipeline";
 import { registerIpc } from "./ipc";
 import { createLogger } from "./logger";
@@ -105,13 +105,18 @@ function broadcast(channel: string, payload: unknown): void {
   }
 }
 
+const agentRuntimes = createAgentRuntimeFactory();
 const describer = new Describer(
   (progress) => broadcast(IPC.analyzeProgress, progress),
-  createAnalyzeRuntime("Describer"),
+  agentRuntimes.create("Describer"),
 );
-const builder = new SkillBuilder((progress) => broadcast(IPC.skillProgress, progress));
-const automationBuilder = new AutomationBuilder((progress) =>
-  broadcast(IPC.automationProgress, progress),
+const builder = new SkillBuilder(
+  (progress) => broadcast(IPC.skillProgress, progress),
+  agentRuntimes.create("SkillBuilder"),
+);
+const automationBuilder = new AutomationBuilder(
+  (progress) => broadcast(IPC.automationProgress, progress),
+  agentRuntimes.create("AutomationBuilder"),
 );
 
 /** Open, focus, and re-dock the Sessions library window (creating it lazily). */
