@@ -5,6 +5,16 @@
     "baseUrl": "https://api.example.com/v1",
     "model": "your-vision-model",
     "vision": true,
-    "apiKeyEnv": "MY_SKILL_RECORDER_API_KEY"
+    "apiKeyEnv": "MY_SKILL_RECORDER_API_KEY",
+    "modelPresets": [
+      {
+        "id": "your-vision-model",
+        "label": "My Vision Model",
+        "badge": "M",
+        "source": "My provider",
+        "verified": false,
+        "capabilities": ["vision", "function-calling", "multi-turn-tools"]
+      }
+    ]
   }
 }

@@ -4,9 +4,9 @@
 
 Better Skill Recorder captures a real work session on your screen: the clicks, the app and
 window switches, the pages you visit, and (if you want) your spoken narration. It then uses
-the **GitHub Copilot CLI** to reconstruct *what you actually did* as a clear **intent plus
-an ordered list of steps**. From there, one step turns that single run into something an
-agent can reuse:
+**GitHub Copilot or your configured OpenAI-compatible model** to reconstruct *what you
+actually did* as a clear **intent plus an ordered list of steps**. From there, one step
+turns that single run into something an agent can reuse:
 
 - a **Skill**: a `SKILL.md` procedure an agent runs on demand, or
 - an **Automation**: the same procedure on a schedule or trigger.
@@ -20,6 +20,22 @@ form can teach the agent to submit *all* of them.
   &nbsp;&nbsp;
   <img src="docs/images/library.png" alt="Skill Recorder sessions view: recorded sessions on the left, the reconstructed intent and ordered steps on the right" width="520">
 </p>
+
+### Bring your own model
+
+The **Model control** page switches every AI workflow between the bundled GitHub Copilot
+runtime and an OpenAI-compatible endpoint. Base URL, exact model ID, visual analysis, and
+globally configurable model presets are all visible before activation; API keys are stored
+separately with operating-system encryption.
+
+<p align="center">
+  <img src="docs/images/model-control.jpg" alt="Better Skill Recorder model control page showing GitHub Copilot and OpenAI-compatible provider routing" width="760">
+</p>
+
+The included preset list is data-driven rather than hard-coded into the UI. See
+[`docs/MODEL_CONFIGURATION.md`](docs/MODEL_CONFIGURATION.md) for configuration and
+[`docs/OPENAI_COMPATIBLE_VALIDATION.md`](docs/OPENAI_COMPATIBLE_VALIDATION.md) for the
+compatibility matrix and validation boundaries.
 
 ## How it works
 
@@ -38,8 +54,8 @@ form can teach the agent to submit *all* of them.
 
 Better Skill Recorder is published as a **source release**: one command downloads a pinned Node.js
 runtime, builds the exact release commit on your machine, and adds a **Better Skill Recorder**
-app you can relaunch anytime. Nothing is installed globally. You'll need a GitHub account with
-**Copilot access**; the Copilot CLI ships with the app.
+app you can relaunch anytime. Nothing is installed globally. Use either a GitHub account with
+**Copilot access** (the Copilot CLI ships with the app) or credentials for a compatible endpoint.
 
 macOS is the primary target. Windows 11 (x64 and ARM64) is supported too (see
 [`WINDOWS-VALIDATION.md`](WINDOWS-VALIDATION.md)).
@@ -79,7 +95,9 @@ This adds **Better Skill Recorder** shortcuts to your desktop and Start Menu.
 1. **Grant Screen Recording.** On first launch, macOS asks for Screen Recording permission;
    grant it and you're ready to record.
 2. **Record, Analyze, Create.** Do your task, then Analyze. The first time you Analyze,
-   Better Skill Recorder offers **Sign in to Copilot** if you aren't signed in yet.
+   Better Skill Recorder offers **Sign in to Copilot** if that is your selected provider
+   and you aren't signed in yet. Custom-provider users configure their endpoint under
+   **Sessions → Model control**.
 
 To inspect the script before running it, set install options, update, or uninstall, see
 [`INSTALL.md`](INSTALL.md).
@@ -98,8 +116,9 @@ To inspect the script before running it, set install options, update, or uninsta
 Recording, storage, frame extraction, and optional narration transcription all happen
 **on your computer**; nothing leaves while you record. Only when you choose **Analyze**
 does Better Skill Recorder send the event timeline (window/document titles, URLs, and clipboard
-previews), extracted screen images, and narration text to GitHub's cloud for Copilot to
-process.
+previews), extracted screen images, and narration text to the provider you selected. With
+GitHub Copilot that is GitHub's cloud; with an OpenAI-compatible provider it is the configured
+endpoint. Turning off Visual analysis omits the extracted screen images.
 
 The in-app "Records your screen and activity" panel spells out exactly what's collected:
 
@@ -149,6 +168,8 @@ npm run eval:builder    # score the skill/automation generalization
 - **[evals/README.md](evals/README.md):** the describer / builder eval harness.
 - **[docs/MODEL_CONFIGURATION.md](docs/MODEL_CONFIGURATION.md):** custom endpoint UI,
   JSON configuration, secure API-key storage, precedence, and endpoint requirements.
+- **[docs/OPENAI_COMPATIBLE_VALIDATION.md](docs/OPENAI_COMPATIBLE_VALIDATION.md):** tested
+  models, end-to-end validation scope, privacy boundary, and known limitations.
 - **[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md):** licenses for bundled dependencies.
 
 ## Security
