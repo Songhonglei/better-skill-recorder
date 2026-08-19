@@ -1,6 +1,7 @@
 import type { Collector, CollectorContext } from "../recorder/collector";
 import { createUrlProvider, type UrlProvider } from "./url-provider";
 import type { ActiveWindowResult } from "./window-info";
+import { readMacOSActiveWindow } from "./macos-active-window";
 
 /** Base cadence for app/title polling. Browsers poll slower (see below). */
 const POLL_MS = 1000;
@@ -111,6 +112,9 @@ export class ActiveWindowCollector implements Collector {
   }
 
   private async readPlatform(): Promise<ActiveWindowResult | undefined> {
+    if (process.platform === "darwin") {
+      return readMacOSActiveWindow(this.mode === "full" ? FULL : DEGRADED);
+    }
     if (process.platform === "win32") {
       const { readWindowsActiveWindow } = await import("./windows-active-window");
       return readWindowsActiveWindow();
