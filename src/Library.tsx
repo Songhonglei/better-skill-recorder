@@ -128,7 +128,14 @@ export function Library() {
           </button>
           <button className={view === "model" ? "active" : ""} onClick={() => setView("model")}>
             <span className="lib-nav-icon model" aria-hidden>✦</span>
-            Model control
+            <span className="lib-nav-copy">
+              <strong>Model control</strong>
+              <small data-no-localize>
+                {providerSettings?.provider === "openai-compatible"
+                  ? providerSettings.model || (language === "zh-CN" ? "自定义端点" : "Custom endpoint")
+                  : "GitHub Copilot"}
+              </small>
+            </span>
             <span className={`lib-nav-signal ${providerSettings?.provider === "openai-compatible" ? "custom" : ""}`} aria-hidden />
           </button>
         </nav>
@@ -155,18 +162,6 @@ export function Library() {
             </div>
           </>
         )}
-        <div className="lib-runtime-card">
-          <span className={`lib-runtime-dot ${providerSettings?.provider === "openai-compatible" ? "custom" : ""}`} />
-          <span>
-            <small>ACTIVE MODEL</small>
-            <strong>
-              {providerSettings?.provider === "openai-compatible"
-                ? providerSettings.model || "Custom endpoint"
-                : "GitHub Copilot"}
-            </strong>
-          </span>
-          <button type="button" onClick={() => setView("model")} aria-label="Open model settings">›</button>
-        </div>
       </aside>
       <main className="lib-detail">
         {view === "model" ? (
@@ -515,6 +510,7 @@ function AnalysisWorkspace({
   narrationStatus: NarrationStatus | null;
   onChanged: () => void | Promise<void>;
 }) {
+  const { language } = useLanguage();
   const sessionId = summary.id;
   const voicePending = summary.hasAudio && !summary.hasNarration;
   const voiceLanguage = narrationLanguageLabel(
@@ -544,6 +540,7 @@ function AnalysisWorkspace({
   const [draftTitle, setDraftTitle] = useState("");
   const [draftIntent, setDraftIntent] = useState("");
   const [confirmReanalysis, setConfirmReanalysis] = useState(false);
+  const [confirmSummaryReanalysis, setConfirmSummaryReanalysis] = useState(false);
   // Directly-editable steps (the source of truth downstream); persisted on a short
   // debounce so typing stays instant. `stepsDirty` gates the persist so seeding from
   // a freshly loaded analysis never writes back.
@@ -626,13 +623,14 @@ function AnalysisWorkspace({
     async () => {
       canceled.current = false;
       setEditing(false);
+      setConfirmSummaryReanalysis(false);
       setDraftTitle("");
       setDraftIntent("");
       setReview(null);
       setError(null);
       setAnalyzing(true);
       setStatusLine("Starting…");
-      const res = await window.skillRecorder.analyze(sessionId);
+      const res = await window.skillRecorder.analyze(sessionId, language);
       if (res.ok && res.analysis) {
         setAnalysis(res.analysis);
         setSteps(res.analysis.steps);
@@ -644,7 +642,7 @@ function AnalysisWorkspace({
       setAnalyzing(false);
       void onChanged();
     },
-    [sessionId, onChanged],
+    [sessionId, language, onChanged],
   );
 
   const cancel = useCallback(async () => {
@@ -812,7 +810,7 @@ function AnalysisWorkspace({
           <div className="status-line">
             <span className="spinner" />
             <span className="status-text">
-              {voiceBusy ? narrationWorkLabel(narrationStatus) : statusLine || "Working…"}
+              {voiceBusy ? narrationWorkLabel(narrationStatus, language) : statusLine || "Working…"}
             </span>
             <button className="linky status-cancel" onClick={cancel}>
               Cancel
@@ -834,9 +832,29 @@ function AnalysisWorkspace({
               <div className="summary-head">
                 <span className="eyebrow">What you did</span>
                 {!editing && (
-                  <button className="linky" onClick={startEdit}>
-                    Edit
-                  </button>
+                  <div className="summary-actions">
+                    {confirmSummaryReanalysis ? (
+                      <>
+                        <button className="linky" onClick={() => setConfirmSummaryReanalysis(false)}>
+                          Cancel
+                        </button>
+                        <button className="secondary" onClick={() => void run()}>
+                          Replace analysis
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        className="linky"
+                        onClick={() => setConfirmSummaryReanalysis(true)}
+                        title="Replaces this analysis and any edits using the current interface language"
+                      >
+                        {language === "zh-CN" ? "重新生成中文分析" : "Re-analyze in English"}
+                      </button>
+                    )}
+                    <button className="linky" onClick={startEdit}>
+                      Edit
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -903,7 +921,7 @@ function AnalysisWorkspace({
 
       {analysis && !analyzing && (
         <div className="ws-foot">
-          <span className="foot-status">{launchFootStatus(summary)}</span>
+          <span className="foot-status">{launchFootStatus(summary, language)}</span>
           <div className="ws-foot-actions">
             {summary.hasSkill && (
               <button className="secondary" onClick={() => setLaunch("skill")} title="Open the skill built from this recording">
@@ -933,16 +951,16 @@ function AnalysisWorkspace({
   );
 }
 
-function narrationWorkLabel(status: NarrationStatus | null): string {
-  if (!status) return "Working…";
-  if (status.phase === "transcribing") return "Transcribing voice…";
-  if (status.phase === "loading") return "Preparing voice model…";
+function narrationWorkLabel(status: NarrationStatus | null, language: "en" | "zh-CN"): string {
+  if (!status) return language === "zh-CN" ? "处理中…" : "Working…";
+  if (status.phase === "transcribing") return language === "zh-CN" ? "正在转写语音…" : "Transcribing voice…";
+  if (status.phase === "loading") return language === "zh-CN" ? "正在准备语音模型…" : "Preparing voice model…";
   if (status.phase === "downloading") {
     return status.progress == null
-      ? "Downloading voice model…"
-      : `Downloading voice model… ${status.progress}%`;
+      ? language === "zh-CN" ? "正在下载语音模型…" : "Downloading voice model…"
+      : language === "zh-CN" ? `正在下载语音模型… ${status.progress}%` : `Downloading voice model… ${status.progress}%`;
   }
-  return "Working…";
+  return language === "zh-CN" ? "处理中…" : "Working…";
 }
 
 /* --- Final stage: target picker + builders -------------------------------- */
@@ -950,11 +968,23 @@ function narrationWorkLabel(status: NarrationStatus | null): string {
 /** Which final-stage surface the analysis workspace is showing. */
 type LaunchTarget = "none" | "picker" | "skill" | "automation";
 
-function launchFootStatus(summary: SessionSummary): string {
-  if (summary.hasSkill && summary.hasAutomation) return "Skill & automation created";
-  if (summary.hasSkill) return "Skill created";
-  if (summary.hasAutomation) return "Automation created";
+function launchFootStatus(summary: SessionSummary, language: "en" | "zh-CN"): string {
+  if (summary.hasSkill && summary.hasAutomation) return language === "zh-CN" ? "技能与自动化均已创建" : "Skill & automation created";
+  if (summary.hasSkill) return language === "zh-CN" ? "技能已创建" : "Skill created";
+  if (summary.hasAutomation) return language === "zh-CN" ? "自动化已创建" : "Automation created";
   return "";
+}
+
+function localizedTarget(target: BuildTarget, language: "en" | "zh-CN"): { label: string; note: string } {
+  if (language === "en") return { label: target.label, note: target.enabled ? target.note : "Coming soon" };
+  const copy: Record<string, { label: string; note: string }> = {
+    "skill:scout": { label: "Scout 技能", note: "按需运行的技能；当描述匹配任务时由 Scout 调用。" },
+    "automation:scout": { label: "Scout 自动化", note: "由触发条件启动、按计划执行的多步骤自动化。" },
+    "skill:cowork": { label: "Cowork 技能", note: "可导出并安装到 Microsoft 365 Copilot（Cowork）的按需技能。" },
+    "skill:agent-skill": { label: "通用智能体技能", note: "适用于任何支持技能的智能体，不绑定特定工具。" },
+    "skill:copilot-studio": { label: "Copilot Studio", note: "即将推出" },
+  };
+  return copy[`${target.kind}:${target.architecture}`] ?? { label: target.label, note: target.enabled ? target.note : "即将推出" };
 }
 
 /** "What do you want to build?" — picks both kind and architecture up front. */
@@ -967,6 +997,7 @@ function TargetPicker({
   onPick: (target: BuildTarget) => void;
   onClose: () => void;
 }) {
+  const { language } = useLanguage();
   return (
     <section className="ws">
       <div className="ws-head">
@@ -982,17 +1013,18 @@ function TargetPicker({
         <div className="sb-arch">
           <p className="sb-lead">What do you want to build from this recording?</p>
           <div className="arch-grid">
-            {TARGETS.map((t) => (
-              <button
+            {TARGETS.map((t) => {
+              const copy = localizedTarget(t, language);
+              return <button
                 key={`${t.kind}:${t.architecture}`}
                 className="arch-card"
                 disabled={!t.enabled}
                 onClick={() => t.enabled && onPick(t)}
               >
-                <span className="arch-name">{t.label}</span>
-                <span className="arch-note">{t.enabled ? t.note : "Coming soon"}</span>
-              </button>
-            ))}
+                <span className="arch-name">{copy.label}</span>
+                <span className="arch-note">{copy.note}</span>
+              </button>;
+            })}
           </div>
         </div>
       </div>
@@ -1017,6 +1049,7 @@ function SkillBuilderView({
   hasSkill: boolean;
   onClose: () => void;
 }) {
+  const { language } = useLanguage();
   const defaultPlacementFor = useCallback(
     (architecture: SkillArchitecture): SkillPlacement =>
       skillPlacementModel(skillTargetFor(architecture)).defaultPlacement,
@@ -1084,7 +1117,7 @@ function SkillBuilderView({
     setError(null);
     setStatusLine("Planning the skill…");
     setPhase("planning");
-    const res = await window.skillRecorder.buildSkill({ sessionId, architecture });
+    const res = await window.skillRecorder.buildSkill({ sessionId, architecture, language });
     inFlight.current = false;
     if (res.ok && res.plan) {
       setPlan(res.plan);
@@ -1093,7 +1126,7 @@ function SkillBuilderView({
       setError(res.error ?? "Planning failed");
       setPhase("ready");
     }
-  }, [sessionId, architecture]);
+  }, [sessionId, architecture, language]);
 
   const place = useCallback(
     async (which: SkillPlacement) => {
@@ -1160,9 +1193,13 @@ function SkillBuilderView({
 
         {phase === "ready" && (
           <div className="sb-arch">
-            <p className="sb-lead">Build a {archLabel(architecture)} skill from this recording.</p>
+            <p className="sb-lead">
+              {language === "zh-CN"
+                ? `根据这条录制构建 ${archLabel(architecture)} 技能。`
+                : `Build a ${archLabel(architecture)} skill from this recording.`}
+            </p>
             <button className="record-cta" onClick={() => void runPlan()}>
-              Plan the skill →
+              {language === "zh-CN" ? "规划技能 →" : "Plan the skill →"}
             </button>
           </div>
         )}
@@ -1221,13 +1258,21 @@ function SkillBuilderView({
               ✓
             </div>
             <h2 className="sb-title">
-              {placement === "install" ? placementModel.installDoneTitle : "Skill exported"}
+              {placement === "install"
+                ? language === "zh-CN"
+                  ? `已添加到 ${skillTargetFor(architecture).installTargetLabel}`
+                  : placementModel.installDoneTitle
+                : language === "zh-CN" ? "技能已导出" : "Skill exported"}
             </h2>
             <p>
               <code className="sb-slug">{builtName}</code>{" "}
               {placement === "install"
-                ? placementModel.installDoneMessage
-                : `is built for ${archLabel(architecture)}. Install it wherever ${archLabel(architecture)} loads skills.`}
+                ? language === "zh-CN"
+                  ? `现已存放在 ${skillTargetFor(architecture).installTargetLabel}，会自动加载。`
+                  : placementModel.installDoneMessage
+                : language === "zh-CN"
+                  ? `已为 ${archLabel(architecture)} 构建。请将它安装到 ${archLabel(architecture)} 加载技能的位置。`
+                  : `is built for ${archLabel(architecture)}. Install it wherever ${archLabel(architecture)} loads skills.`}
             </p>
             {exportedPath && <p className="sb-path">{exportedPath}</p>}
           </div>
@@ -1243,9 +1288,17 @@ function SkillBuilderView({
                 key={action.placement}
                 className={action.primary ? "record-cta" : "ghost"}
                 onClick={() => void place(action.placement)}
-                title={action.title}
+                title={language === "zh-CN"
+                  ? action.placement === "install"
+                    ? `添加到 ${skillTargetFor(architecture).installTargetLabel} 并自动加载`
+                    : "将技能下载到你选择的文件夹"
+                  : action.title}
               >
-                {action.label}
+                {language === "zh-CN"
+                  ? action.placement === "install"
+                    ? `添加到 ${skillTargetFor(architecture).installTargetLabel}`
+                    : action.primary ? "导出技能" : "导出…"
+                  : action.label}
               </button>
             ))}
           </div>
@@ -1254,11 +1307,11 @@ function SkillBuilderView({
 
       {phase === "done" && (
         <div className="ws-foot">
-          <span className="foot-status">Skill created</span>
+          <span className="foot-status">{language === "zh-CN" ? "技能已创建" : "Skill created"}</span>
           <div className="ws-foot-actions">
             {exportedPath && (
               <button className="record-cta" onClick={() => void window.skillRecorder.revealSkill(sessionId)}>
-                Reveal file
+                {language === "zh-CN" ? "在访达中显示" : "Reveal file"}
               </button>
             )}
           </div>
@@ -1287,6 +1340,7 @@ function AutomationBuilderView({
   hasAutomation: boolean;
   onClose: () => void;
 }) {
+  const { language } = useLanguage();
   const [phase, setPhase] = useState<BuildPhase>(hasAutomation ? "loading" : "ready");
   const [architecture, setArchitecture] = useState<SkillArchitecture>(initialArch);
   const [plan, setPlan] = useState<AutomationPlan | null>(null);
@@ -1344,7 +1398,7 @@ function AutomationBuilderView({
     setError(null);
     setStatusLine("Planning the automation…");
     setPhase("planning");
-    const res = await window.skillRecorder.buildAutomation({ sessionId, architecture });
+    const res = await window.skillRecorder.buildAutomation({ sessionId, architecture, language });
     inFlight.current = false;
     if (res.ok && res.plan) {
       setPlan(res.plan);
@@ -1353,7 +1407,7 @@ function AutomationBuilderView({
       setError(res.error ?? "Planning failed");
       setPhase("ready");
     }
-  }, [sessionId, architecture]);
+  }, [sessionId, architecture, language]);
 
   const create = useCallback(async () => {
     if (!plan) return;
@@ -1413,9 +1467,13 @@ function AutomationBuilderView({
 
         {phase === "ready" && (
           <div className="sb-arch">
-            <p className="sb-lead">Build a {archLabel(architecture)} automation from this recording.</p>
+            <p className="sb-lead">
+              {language === "zh-CN"
+                ? `根据这条录制构建 ${archLabel(architecture)} 自动化。`
+                : `Build a ${archLabel(architecture)} automation from this recording.`}
+            </p>
             <button className="record-cta" onClick={() => void runPlan()}>
-              Plan the automation →
+              {language === "zh-CN" ? "规划自动化 →" : "Plan the automation →"}
             </button>
           </div>
         )}
@@ -1489,13 +1547,16 @@ function AutomationBuilderView({
             </div>
             <h2 className="sb-title">Automation ready</h2>
             <p>
-              <code className="sb-slug">{builtName}</code> is built for {archLabel(architecture)}.
+              <code className="sb-slug">{builtName}</code>{" "}
+              {language === "zh-CN"
+                ? `已为 ${archLabel(architecture)} 构建。`
+                : `is built for ${archLabel(architecture)}.`}
             </p>
             {exportedPath && <p className="sb-path">{exportedPath}</p>}
             <p className="sb-import-hint">
-              Import it into {automationInstallTargetLabel}: open{" "}
-              {automationInstallTargetLabel} → Automations → Import, and choose this bundle
-              folder.
+              {language === "zh-CN"
+                ? `将其导入 ${automationInstallTargetLabel}：打开 ${automationInstallTargetLabel} → Automations → Import，然后选择此文件包文件夹。`
+                : `Import it into ${automationInstallTargetLabel}: open ${automationInstallTargetLabel} → Automations → Import, and choose this bundle folder.`}
             </p>
           </div>
         )}
@@ -1518,14 +1579,14 @@ function AutomationBuilderView({
 
       {phase === "done" && (
         <div className="ws-foot">
-          <span className="foot-status">Automation created</span>
+          <span className="foot-status">{language === "zh-CN" ? "自动化已创建" : "Automation created"}</span>
           <div className="ws-foot-actions">
             {exportedPath && (
               <button
                 className="record-cta"
                 onClick={() => void window.skillRecorder.revealAutomation(sessionId)}
               >
-                Reveal bundle
+                {language === "zh-CN" ? "显示文件包" : "Reveal bundle"}
               </button>
             )}
           </div>

@@ -43,6 +43,12 @@ const CREATE_PROMPT =
   "value by its {{id}} token (never inline the literal). The name and description are already decided — " +
   "you may echo them.";
 
+function outputLanguagePrompt(language?: SkillBuildInput["language"]): string {
+  return language === "zh-CN"
+    ? " Write all user-facing plan and SKILL.md prose in Simplified Chinese, including titles, descriptions, summaries, generalization notes, value names, step titles, step descriptions, and the final instructions body. Keep slugs, tool IDs, {{tokens}}, URLs, file paths, commands, code, and product names in their original form."
+    : " Write all user-facing plan and SKILL.md prose in English.";
+}
+
 const msg = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
 /** Root folder Scout auto-loads user skills from (overridable for dev/tests). */
@@ -72,6 +78,7 @@ interface LiveBuild extends BaseLive {
   holder: { plan: SkillPlan | undefined; submission: SkillSubmission | undefined };
   /** Last plan proposed this build (kept so submit can reference it). */
   lastPlan: SkillPlan | null;
+  language?: SkillBuildInput["language"];
 }
 
 function readJson<T>(file: string): T | null {
@@ -109,7 +116,7 @@ export class SkillBuilder extends AgentBuilder<LiveBuild> {
 
   /** Propose a plan (first pass) or refine the current one with NL feedback. */
   async build(input: SkillBuildInput): Promise<SkillPlan> {
-    const { sessionId, architecture, feedback } = input;
+    const { sessionId, architecture, feedback, language } = input;
     if (this.active.has(sessionId)) throw new Error("A build is already running for this session.");
     requireCatalogue(architecture, "skill");
     const analysis = loadPersistedAnalysis(sessionId);
@@ -122,9 +129,12 @@ export class SkillBuilder extends AgentBuilder<LiveBuild> {
       let live = this.live.get(sessionId);
       if (!refining || !live) {
         await this.disposeLive(sessionId); // fresh conversation for a fresh plan
-        live = await this.createLive(sessionId, architecture);
+        live = await this.createLive(sessionId, architecture, language);
       }
-      const prompt = refining ? renderRefinePrompt(feedback!.trim(), live.lastPlan) : KICKOFF_PROMPT;
+      if (language) live.language = language;
+      const effectiveLanguage = language ?? live.language;
+      const prompt = (refining ? renderRefinePrompt(feedback!.trim(), live.lastPlan) : KICKOFF_PROMPT) +
+        outputLanguagePrompt(effectiveLanguage);
       return await this.runProposeTurn(live, prompt);
     } finally {
       this.active.delete(sessionId);
@@ -160,7 +170,7 @@ export class SkillBuilder extends AgentBuilder<LiveBuild> {
       this.emit(sessionId, "drafting", "Writing the skill…");
       live.holder.submission = undefined;
       try {
-        await live.agent.run(`${CREATE_PROMPT}\n\n${renderPlanForPrompt(plan)}`, {
+        await live.agent.run(`${CREATE_PROMPT}${outputLanguagePrompt(live.language)}\n\n${renderPlanForPrompt(plan)}`, {
           timeoutMs: TURN_TIMEOUT_MS,
         });
       } catch (err) {
@@ -207,7 +217,11 @@ export class SkillBuilder extends AgentBuilder<LiveBuild> {
     this.emitProgress({ sessionId, phase, message });
   }
 
-  private async createLive(sessionId: string, architecture: SkillArchitecture): Promise<LiveBuild> {
+  private async createLive(
+    sessionId: string,
+    architecture: SkillArchitecture,
+    language?: SkillBuildInput["language"],
+  ): Promise<LiveBuild> {
     const dir = sessionDir(sessionId);
     const analysis = loadPersistedAnalysis(sessionId);
     if (!analysis) throw new Error("There is no analysis for this recording yet.");
@@ -247,6 +261,7 @@ export class SkillBuilder extends AgentBuilder<LiveBuild> {
       agent,
       holder,
       lastPlan: null,
+      language,
     };
     this.registerLive(live);
     return live;

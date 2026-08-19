@@ -326,7 +326,15 @@ function clampControlsToDisplay(): void {
 
 app.whenReady().then(async () => {
   if (process.platform === "win32") Menu.setApplicationMenu(null);
-  if (dock && app.dock) app.dock.setIcon(dock);
+  if (process.platform === "darwin") {
+    // Tray-first Electron launches can otherwise be classified as a UIElement by
+    // LaunchServices, which hides the running app from both Dock and Cmd+Tab.
+    app.setActivationPolicy("regular");
+    if (app.dock) {
+      await app.dock.show();
+      if (dock) app.dock.setIcon(dock);
+    }
+  }
 
   const userData = app.getPath("userData");
   const configuredPath = process.env.SKILL_RECORDER_CONFIG_FILE?.trim();

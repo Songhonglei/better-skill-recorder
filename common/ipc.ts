@@ -161,7 +161,12 @@ export interface SensitiveModelActionResult {
 /** Feedback payload sent from the renderer for a re-analysis round. */
 export interface AnalysisFeedbackInput extends AnalysisFeedback {
   sessionId: string;
+  /** Language for model-generated, user-facing analysis text. */
+  language?: UiOutputLanguage;
 }
+
+/** Renderer-selected language for model-generated, user-facing content. */
+export type UiOutputLanguage = "en" | "zh-CN";
 
 /** A direct edit to the analysis, applied without re-running the agent. Any subset
  *  of fields may be sent; the rest are left untouched. */
@@ -191,6 +196,8 @@ export interface SkillBuildInput {
   architecture: SkillArchitecture;
   /** Natural-language refinement for the current plan; omit for the first pass. */
   feedback?: string;
+  /** Language for model-generated plan and skill prose. */
+  language?: UiOutputLanguage;
 }
 
 /** Result of a propose/refine round: the plan to show the user. */
@@ -236,6 +243,8 @@ export interface AutomationBuildInput {
   architecture: SkillArchitecture;
   /** Natural-language refinement for the current plan; omit for the first pass. */
   feedback?: string;
+  /** Language for model-generated plan prose. */
+  language?: UiOutputLanguage;
 }
 
 /** Result of a propose/refine round: the automation plan to show the user. */
@@ -546,7 +555,7 @@ export interface SkillRecorderApi {
    *  Runs an on-device sensitive-detail scan first and redacts any flagged values
    *  from the text before it is sent — non-blocking; the analysis always proceeds
    *  and any redaction is reported back in `review`. */
-  analyze(sessionId?: string): Promise<AnalyzeResult>;
+  analyze(sessionId?: string, language?: UiOutputLanguage): Promise<AnalyzeResult>;
   /** Send NL feedback and re-analyze in the same multi-turn session. */
   analyzeFeedback(input: AnalysisFeedbackInput): Promise<AnalyzeResult>;
   /** Load the persisted analysis for a session, if any. */

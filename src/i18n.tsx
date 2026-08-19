@@ -67,6 +67,21 @@ const ZH: Record<string, string> = {
   "By default, before anything is sent, this computer hides sensitive details like passwords, keys, emails, and card or ID numbers from the text and your screen images. You can turn this off in What's recorded for more accurate analysis. It can miss things, so it is a safety net, not a guarantee.": "默认情况下，本机会在发送前隐藏文本和屏幕图像中的密码、密钥、邮箱、银行卡号或证件号等敏感信息。你可以在“会录制什么”中关闭此功能以获得更准确的分析。它可能存在漏检，因此只是安全网而非绝对保证。",
   "Working…": "处理中…",
   "Starting…": "正在启动…",
+  "Starting analysis…": "正在开始分析…",
+  "Re-analyzing with your feedback…": "正在结合反馈重新分析…",
+  "Thinking…": "正在思考…",
+  "Reading the approved analysis…": "正在读取已确认的分析…",
+  "Reading the timeline…": "正在读取时间线…",
+  "Listing available frames…": "正在整理可用画面…",
+  "Reading the voice narration…": "正在读取语音旁白…",
+  "Received analysis draft.": "已收到分析草稿。",
+  "Asking the agent to finalize its analysis…": "正在请模型完成分析…",
+  "Finalizing analysis…": "正在完成分析…",
+  "Refining the plan…": "正在优化方案…",
+  "Plan ready for your review.": "方案已准备好，请检查。",
+  "Proposed a plan for your review.": "已生成技能方案，请检查。",
+  "Proposed an automation plan for your review.": "已生成自动化方案，请检查。",
+  "Received the finished skill.": "已收到完成的技能。",
   "Stopping…": "正在停止…",
   "Transcribing voice…": "正在转写语音…",
   "Preparing voice model…": "正在准备语音模型…",
@@ -75,6 +90,7 @@ const ZH: Record<string, string> = {
   "Voice transcript added after this analysis": "本次分析完成后新增了语音转写",
   "Re-analyze to include it. This replaces the current summary and any edits.": "重新分析即可纳入语音内容；当前摘要和编辑内容将被替换。",
   "Replace analysis": "替换分析",
+  "Replaces this analysis and any edits using the current interface language": "使用当前界面语言重新生成，并替换本次分析及所有编辑内容",
   "Re-analyze with voice": "结合语音重新分析",
   "Create…": "创建…",
   "Create another →": "再创建一个 →",
@@ -98,11 +114,14 @@ const ZH: Record<string, string> = {
   "What the skill will do": "技能将完成什么",
   "What the automation will do": "自动化将完成什么",
   "When it runs": "运行时间",
+  "A recording has no schedule of its own — set when this automation should run.": "录制本身不包含计划时间，请设置自动化的运行时间。",
+  "Click any step to edit, or a highlighted value to change it. Reorder, add or remove as needed.": "点击任一步骤或高亮变量即可编辑，也可以按需排序、添加或删除。",
   "Automation ready": "自动化已就绪",
   "Create skill": "创建技能",
   "Create automation": "创建自动化",
   "Create & export skill": "创建并导出技能",
   "Create & export automation": "创建并导出自动化",
+  "Create and export the automation bundle": "创建并导出自动化文件包",
   "Reveal skill": "显示技能",
   "Reveal bundle": "显示文件包",
   "Close": "关闭",
@@ -347,6 +366,11 @@ function translateDynamic(value: string): string | null {
   if ((match = value.match(/^Next: (.+)$/))) return `下次使用：${match[1]}`;
   if ((match = value.match(/^Listening · (.+)$/))) return `正在聆听 · ${match[1]}`;
   if ((match = value.match(/^Downloading voice model… (\d+)%$/))) return `正在下载语音模型… ${match[1]}%`;
+  if ((match = value.match(/^Analysis ready \(revision (\d+)\)\.$/))) return `分析已完成（版本 ${match[1]}）。`;
+  if ((match = value.match(/^Looking at (.+)…$/))) return `正在查看 ${match[1]}…`;
+  if ((match = value.match(/^Attached (\d+) frame image\(s\) from (.+)\.$/))) return `已附加 ${match[1]} 张画面（${match[2]}）。`;
+  if ((match = value.match(/^Searching narration for “(.+)”…$/))) return `正在旁白中搜索“${match[1]}”…`;
+  if ((match = value.match(/^(.+) — click to edit$/))) return `${match[1]} — 点击编辑`;
   if ((match = value.match(/^Setting up the on-device model… (\d+)%$/))) return `正在配置本机模型… ${match[1]}%`;
   if ((match = value.match(/^(\d+) READY$/))) return `${match[1]} 个可用`;
   if ((match = value.match(/^(GitHub Copilot|Custom model) is active\. New analyses use this configuration\.$/))) {
@@ -551,7 +575,6 @@ export function LanguageSwitcher() {
       aria-label={language === "zh-CN" ? "界面语言" : "Interface language"}
       data-no-localize
     >
-      <span className="language-switcher-label">{language === "zh-CN" ? "界面" : "UI"}</span>
       <button
         type="button"
         className={language === "en" ? "active" : ""}

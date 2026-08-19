@@ -28,11 +28,18 @@ const TURN_TIMEOUT_MS = 180_000;
 /** Cap on simultaneously-held live agent sessions; oldest idle ones are evicted. */
 const MAX_LIVE_SESSIONS = 4;
 
-function kickoffPrompt(vision: boolean): string {
+function outputLanguagePrompt(language?: "en" | "zh-CN"): string {
+  return language === "zh-CN"
+    ? " Write every user-facing field submitted through submit_analysis in Simplified Chinese, including the title, intent, rationale, and every step title and detail. Keep product names, URLs, file paths, commands, and code in their original form."
+    : " Write every user-facing field submitted through submit_analysis in English.";
+}
+
+function kickoffPrompt(vision: boolean, language?: "en" | "zh-CN"): string {
   return (
     "Reconstruct what the user did in this recording. Start with get_timeline, then read events " +
     (vision ? "where anything is unclear, and look at frames only where the events are ambiguous. " : "where anything is unclear. Screen frames are unavailable for this provider. ") +
-    "When confident, call submit_analysis with the overall intent and the ordered list of steps."
+    "When confident, call submit_analysis with the overall intent and the ordered list of steps." +
+    outputLanguagePrompt(language)
   );
 }
 
@@ -118,7 +125,11 @@ export class Describer {
   }
 
   /** First pass: reconstruct the session from scratch. */
-  async analyze(sessionId: string, redaction?: RedactionContext): Promise<Analysis> {
+  async analyze(
+    sessionId: string,
+    redaction?: RedactionContext,
+    language?: "en" | "zh-CN",
+  ): Promise<Analysis> {
     if (this.active.has(sessionId)) throw new Error("An analysis is already running for this session.");
     this.active.add(sessionId);
     try {
@@ -126,14 +137,22 @@ export class Describer {
       await this.disposeLive(sessionId); // fresh conversation each explicit analyze
       const live = await this.createLive(sessionId);
       live.redaction.current = redaction ?? null;
-      return await this.runTurn(live, kickoffPrompt(this.runtime.capabilities.vision));
+      return await this.runTurn(
+        live,
+        kickoffPrompt(this.runtime.capabilities.vision, language),
+      );
     } finally {
       this.active.delete(sessionId);
     }
   }
 
   /** Later pass: fold in NL feedback and revise holistically. */
-  async feedback(sessionId: string, fb: AnalysisFeedback, redaction?: RedactionContext): Promise<Analysis> {
+  async feedback(
+    sessionId: string,
+    fb: AnalysisFeedback,
+    redaction?: RedactionContext,
+    language?: "en" | "zh-CN",
+  ): Promise<Analysis> {
     if (this.active.has(sessionId)) throw new Error("An analysis is already running for this session.");
     this.active.add(sessionId);
     try {
@@ -145,7 +164,7 @@ export class Describer {
       // revision, so a failed turn never leaves a phantom log entry.
       return await this.runTurn(
         live,
-        renderFeedbackPrompt(fb, prior, this.runtime.capabilities.vision),
+        renderFeedbackPrompt(fb, prior, this.runtime.capabilities.vision) + outputLanguagePrompt(language),
         fb,
       );
     } finally {

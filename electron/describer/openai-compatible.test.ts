@@ -110,7 +110,7 @@ test("custom endpoint Analyze and feedback persist validated text-only analysis"
   const describer = new Describer(() => undefined, runtime);
   t.after(() => describer.dispose());
 
-  const first = await describer.analyze(sessionId);
+  const first = await describer.analyze(sessionId, undefined, "zh-CN");
   assert.equal(first.revision, 1);
   assert.equal(first.intent, "Review a captured work timeline.");
 
@@ -140,6 +140,7 @@ test("custom endpoint Analyze and feedback persist validated text-only analysis"
     ["get_timeline", "get_events", "get_narration", "submit_analysis"],
   );
   assert.match(firstBody.messages[0].content, /Screen frame tools are unavailable/);
+  assert.match(firstBody.messages.at(-1)?.content ?? "", /Simplified Chinese/);
 
   const feedbackBody = requests[1].body as { messages: Array<Record<string, unknown>> };
   assert.ok(feedbackBody.messages.some((message) => message.role === "tool"));

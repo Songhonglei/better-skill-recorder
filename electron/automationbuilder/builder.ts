@@ -33,6 +33,12 @@ const KICKOFF_PROMPT =
   "propose_automation_plan with how you'll generalize this task, a sensible default schedule, and the " +
   "generalized prompt-steps. Stop after propose_automation_plan so the user can review it.";
 
+function outputLanguagePrompt(language?: AutomationBuildInput["language"]): string {
+  return language === "zh-CN"
+    ? " Write all user-facing plan fields in Simplified Chinese, including the title, description, summary, generalization, natural-language schedule, value names, step labels, and step prompts. Keep slugs, {{tokens}}, URLs, file paths, commands, code, tool IDs, and product names in their original form."
+    : " Write all user-facing plan fields in English.";
+}
+
 const msg = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
 /** Root folder automation bundles are exported into (overridable for dev/tests). */
@@ -49,6 +55,7 @@ interface LiveBuild extends BaseLive {
   holder: { plan: AutomationPlan | undefined };
   /** Last plan proposed this build (kept so create can reference it). */
   lastPlan: AutomationPlan | null;
+  language?: AutomationBuildInput["language"];
 }
 
 function readJson<T>(file: string): T | null {
@@ -86,7 +93,7 @@ export class AutomationBuilder extends AgentBuilder<LiveBuild> {
 
   /** Propose a plan (first pass) or refine the current one with NL feedback. */
   async build(input: AutomationBuildInput): Promise<AutomationPlan> {
-    const { sessionId, architecture, feedback } = input;
+    const { sessionId, architecture, feedback, language } = input;
     if (this.active.has(sessionId)) throw new Error("A build is already running for this session.");
     requireCatalogue(architecture, "automation");
     const analysis = loadPersistedAnalysis(sessionId);
@@ -99,9 +106,12 @@ export class AutomationBuilder extends AgentBuilder<LiveBuild> {
       let live = this.live.get(sessionId);
       if (!refining || !live) {
         await this.disposeLive(sessionId); // fresh conversation for a fresh plan
-        live = await this.createLive(sessionId, architecture);
+        live = await this.createLive(sessionId, architecture, language);
       }
-      const prompt = refining ? renderRefinePrompt(feedback!.trim(), live.lastPlan) : KICKOFF_PROMPT;
+      if (language) live.language = language;
+      const effectiveLanguage = language ?? live.language;
+      const prompt = (refining ? renderRefinePrompt(feedback!.trim(), live.lastPlan) : KICKOFF_PROMPT) +
+        outputLanguagePrompt(effectiveLanguage);
       return await this.runProposeTurn(live, prompt);
     } finally {
       this.active.delete(sessionId);
@@ -150,7 +160,11 @@ export class AutomationBuilder extends AgentBuilder<LiveBuild> {
     this.emitProgress({ sessionId, phase, message });
   }
 
-  private async createLive(sessionId: string, architecture: SkillArchitecture): Promise<LiveBuild> {
+  private async createLive(
+    sessionId: string,
+    architecture: SkillArchitecture,
+    language?: AutomationBuildInput["language"],
+  ): Promise<LiveBuild> {
     const dir = sessionDir(sessionId);
     const analysis = loadPersistedAnalysis(sessionId);
     if (!analysis) throw new Error("There is no analysis for this recording yet.");
@@ -187,6 +201,7 @@ export class AutomationBuilder extends AgentBuilder<LiveBuild> {
       agent,
       holder,
       lastPlan: null,
+      language,
     };
     this.registerLive(live);
     return live;

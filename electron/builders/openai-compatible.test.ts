@@ -120,7 +120,7 @@ test("custom provider plans, refines, and creates a Skill", async (t) => {
   const builder = new SkillBuilder(() => undefined, runtime);
   t.after(() => builder.dispose());
 
-  const proposed = await builder.build({ sessionId, architecture: "scout" });
+  const proposed = await builder.build({ sessionId, architecture: "scout", language: "zh-CN" });
   assert.equal(proposed.title, "Review example");
   const refined = await builder.build({
     sessionId,
@@ -132,6 +132,10 @@ test("custom provider plans, refines, and creates a Skill", async (t) => {
   assert.ok(existsSync(created.path));
   assert.match(readFileSync(created.path, "utf8"), /https:\/\/example\.com/);
   assert.equal(requests.length, 3);
+  const initialMessages = requests[0].messages as Array<{ content?: string }>;
+  assert.match(initialMessages.at(-1)?.content ?? "", /Simplified Chinese/);
+  const createMessages = requests[2].messages as Array<{ content?: string }>;
+  assert.match(createMessages.at(-1)?.content ?? "", /Simplified Chinese/);
   const refineMessages = requests[1].messages as Array<Record<string, unknown>>;
   assert.ok(refineMessages.some((message) => message.role === "tool"));
 });
@@ -196,7 +200,7 @@ test("custom provider plans and refines an Automation before deterministic expor
   const builder = new AutomationBuilder(() => undefined, runtime);
   t.after(() => builder.dispose());
 
-  await builder.build({ sessionId, architecture: "scout" });
+  await builder.build({ sessionId, architecture: "scout", language: "zh-CN" });
   const refined = await builder.build({
     sessionId,
     architecture: "scout",
@@ -208,4 +212,6 @@ test("custom provider plans and refines an Automation before deterministic expor
   assert.match(readFileSync(created.path, "utf8"), /https:\/\/example\.com/);
   // Export is deterministic and does not make a third model request.
   assert.equal(requests.length, 2);
+  const initialMessages = requests[0].messages as Array<{ content?: string }>;
+  assert.match(initialMessages.at(-1)?.content ?? "", /Simplified Chinese/);
 });

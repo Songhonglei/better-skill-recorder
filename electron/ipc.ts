@@ -233,7 +233,7 @@ export function registerIpc(
 
   ipcMain.handle(
     IPC.analyze,
-    async (_event, sessionId?: string): Promise<AnalyzeResult> => {
+    async (_event, sessionId?: string, language?: "en" | "zh-CN"): Promise<AnalyzeResult> => {
       const id = resolveSessionId(sessionId);
       if (!id) return { ok: false, error: "No completed session to analyze yet." };
       if (!isValidSessionId(id)) return { ok: false, error: "Unknown session." };
@@ -248,7 +248,7 @@ export function registerIpc(
       // proceeds; the (raw-value-free) report is returned purely for a UI summary.
       const { redaction, report } = await buildRedaction(id);
       try {
-        const analysis = await describer.analyze(id, redaction);
+        const analysis = await describer.analyze(id, redaction, language);
         const review = summarizeProtection(report, redaction);
         saveSensitiveReport(id, review);
         return { ok: true, analysis, review };
@@ -271,6 +271,7 @@ export function registerIpc(
           input.sessionId,
           { overall: input.overall, steps: input.steps ?? [] },
           redaction,
+          input.language,
         );
         const review = summarizeProtection(report, redaction);
         saveSensitiveReport(input.sessionId, review);
