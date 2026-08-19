@@ -7,6 +7,19 @@ import { RuntimeConnection } from "@github/copilot-sdk";
 const require = createRequire(import.meta.url);
 
 /**
+ * Electron's patched resolver can see files inside app.asar, so require.resolve()
+ * returns a virtual `app.asar/.../copilot` path even when electron-builder has
+ * correctly unpacked the native executable beside the archive. Node's fs APIs
+ * understand that virtual path; the operating-system spawn call does not.
+ */
+export function executablePathForSpawn(resolvedPath: string): string {
+  return resolvedPath.replace(
+    /([\\/])app\.asar([\\/])/u,
+    "$1app.asar.unpacked$2",
+  );
+}
+
+/**
  * Resolve the path to the bundled Copilot CLI binary. The SDK's own resolution
  * (`getBundledCliPath`) uses `import.meta.resolve` relative to its bundle location,
  * which fails when the SDK is externalized by Vite (the bundle lives in dist-electron/
@@ -18,7 +31,7 @@ export function resolveCopilotCliPath(): string | undefined {
   const arch = process.arch;
   const packageName = `@github/copilot-${platform}-${arch}`;
   try {
-    const resolved = require.resolve(packageName);
+    const resolved = executablePathForSpawn(require.resolve(packageName));
     if (existsSync(resolved)) return resolved;
   } catch {}
   try {
