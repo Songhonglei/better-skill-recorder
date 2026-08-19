@@ -17,6 +17,7 @@ import {
   type NarrationLanguage,
 } from "../common/narration";
 import { formatMs } from "./format";
+import { translateUiText, useLanguage, type UiLanguage } from "./i18n";
 import { RecordingPrivacyWarning } from "./RecordingPrivacyWarning";
 import { WhatsRecorded } from "./WhatsRecorded";
 
@@ -24,6 +25,28 @@ const IS_MAC = typeof navigator !== "undefined" && /Mac/i.test(navigator.userAge
 /** Mirrors the main-process global shortcut "CommandOrControl+Shift+R", per OS. */
 const TOGGLE_SHORTCUT = IS_MAC ? "⌘⇧R" : "Ctrl+Shift+R";
 type PrivacyReviewOrigin = "home" | "warning";
+type NarrationLanguageMode = "auto" | "manual";
+
+const AUTO_NARRATION_LANGUAGE = "auto";
+const NARRATION_LANGUAGE_MODE_KEY = "better-skill-recorder.narration-language-mode";
+const MANUAL_NARRATION_LANGUAGE_KEY = "better-skill-recorder.narration-language-manual";
+
+function narrationLanguageForUi(language: UiLanguage): NarrationLanguage {
+  return language === "zh-CN" ? "zh" : "en";
+}
+
+function savedNarrationLanguageMode(): NarrationLanguageMode {
+  if (typeof window === "undefined") return "auto";
+  return window.localStorage.getItem(NARRATION_LANGUAGE_MODE_KEY) === "manual"
+    ? "manual"
+    : "auto";
+}
+
+function savedManualNarrationLanguage(): NarrationLanguage {
+  if (typeof window === "undefined") return DEFAULT_NARRATION_LANGUAGE;
+  const saved = window.localStorage.getItem(MANUAL_NARRATION_LANGUAGE_KEY);
+  return isNarrationLanguage(saved) ? saved : DEFAULT_NARRATION_LANGUAGE;
+}
 
 /** The HUD fills the window (`height:100vh`), so its own box can't reveal how tall the
  *  content actually is. Sum the in-flow children (skipping absolute/fixed overlays like
@@ -46,6 +69,7 @@ function measureHudHeight(hud: HTMLElement): number {
 }
 
 export function Recorder() {
+  const { language } = useLanguage();
   const [status, setStatus] = useState<RecorderStatus | null>(null);
   const [doctor, setDoctor] = useState<DoctorReport | null>(null);
   const [narrationStatus, setNarrationStatus] = useState<NarrationStatus | null>(null);
@@ -60,6 +84,11 @@ export function Recorder() {
   const [showNarrationSettings, setShowNarrationSettings] = useState(false);
   const [narrationLanguage, setSelectedNarrationLanguage] =
     useState<NarrationLanguage>(DEFAULT_NARRATION_LANGUAGE);
+  const [narrationLanguageMode, setNarrationLanguageMode] =
+    useState<NarrationLanguageMode>(savedNarrationLanguageMode);
+  const [manualNarrationLanguage, setManualNarrationLanguage] =
+    useState<NarrationLanguage>(savedManualNarrationLanguage);
+  const [narrationLanguagePending, setNarrationLanguagePending] = useState(false);
   const [sensitive, setSensitive] = useState<SensitiveModelStatus | null>(null);
   const [advancedPending, setAdvancedPending] = useState(false);
   const [microphonePending, setMicrophonePending] = useState(false);
@@ -128,7 +157,14 @@ export function Recorder() {
   const justSaved = !recording && status?.lastFinish?.outcome === "saved";
   const justDiscarded = !recording && status?.lastFinish?.outcome === "discarded";
   const narrate = microphoneSettings?.narrationEnabled ?? false;
-  const narrationLanguageName = narrationLanguageLabel(narrationLanguage);
+  const desiredNarrationLanguage =
+    narrationLanguageMode === "auto"
+      ? narrationLanguageForUi(language)
+      : manualNarrationLanguage;
+  const narrationLanguageName = translateUiText(
+    narrationLanguageLabel(narrationLanguage),
+    language,
+  );
   const advancedOn = sensitive?.enabled ?? true;
   const selectedScreenLabel =
     screenSettings?.selectedSourceLabel ?? "Loading screens...";
@@ -138,6 +174,42 @@ export function Recorder() {
       setShowNarrationSettings(false);
     }
   }, [recording]);
+
+  useEffect(() => {
+    if (
+      !status ||
+      status.state === "recording" ||
+      status.transition !== "none" ||
+      status.narrationLanguage === desiredNarrationLanguage
+    ) {
+      return;
+    }
+
+    setNarrationLanguagePending(true);
+    void (async () => {
+      try {
+        const result = await window.skillRecorder.setNarrationLanguage(
+          desiredNarrationLanguage,
+        );
+        if (!result.ok) {
+          window.alert(result.error ?? "Could not change the narration language.");
+        }
+        applyRecorderStatus(await window.skillRecorder.status());
+      } catch (error) {
+        window.alert(
+          error instanceof Error ? error.message : "Could not change the narration language.",
+        );
+      } finally {
+        setNarrationLanguagePending(false);
+      }
+    })();
+  }, [
+    applyRecorderStatus,
+    desiredNarrationLanguage,
+    status?.narrationLanguage,
+    status?.state,
+    status?.transition,
+  ]);
 
   useEffect(() => {
     if (!showNarrationSettings) return;
@@ -253,17 +325,22 @@ export function Recorder() {
   }, []);
 
   const selectNarrationLanguage = useCallback(
-    async (value: string) => {
+    (value: string) => {
+      if (value === AUTO_NARRATION_LANGUAGE) {
+        window.localStorage.setItem(NARRATION_LANGUAGE_MODE_KEY, "auto");
+        setNarrationLanguageMode("auto");
+        return;
+      }
       if (!isNarrationLanguage(value)) {
         window.alert("Unsupported narration language.");
         return;
       }
-      setSelectedNarrationLanguage(value);
-      const result = await window.skillRecorder.setNarrationLanguage(value);
-      if (!result.ok) window.alert(result.error ?? "Could not change the narration language.");
-      applyRecorderStatus(await window.skillRecorder.status());
+      window.localStorage.setItem(NARRATION_LANGUAGE_MODE_KEY, "manual");
+      window.localStorage.setItem(MANUAL_NARRATION_LANGUAGE_KEY, value);
+      setManualNarrationLanguage(value);
+      setNarrationLanguageMode("manual");
     },
-    [applyRecorderStatus],
+    [],
   );
 
   const toggleNarration = useCallback(async () => {
@@ -335,7 +412,7 @@ export function Recorder() {
   }, []);
 
   return (
-    <div className="hud" ref={hudRef}>
+    <div className="hud" ref={hudRef} data-language={language}>
       <div className="transport">
         <button
           className={`record ${recording ? "on" : ""}`}
@@ -471,16 +548,29 @@ export function Recorder() {
             <div className="narrate-select-wrap">
               <select
                 id="narrate-language"
-                value={narrationLanguage}
-                disabled={microphonePending || recording || transitioning}
-                onChange={(event) =>
-                  void selectNarrationLanguage(event.currentTarget.value)
+                value={
+                  narrationLanguageMode === "auto"
+                    ? AUTO_NARRATION_LANGUAGE
+                    : manualNarrationLanguage
                 }
-                title="The transcript stays in this language"
+                disabled={
+                  narrationLanguagePending || microphonePending || recording || transitioning
+                }
+                onChange={(event) =>
+                  selectNarrationLanguage(event.currentTarget.value)
+                }
+                title={
+                  language === "zh-CN"
+                    ? "转写文本将使用此语言"
+                    : "The transcript stays in this language"
+                }
               >
+                <option value={AUTO_NARRATION_LANGUAGE}>
+                  {language === "zh-CN" ? "跟随界面（中文）" : "Follow interface (English)"}
+                </option>
                 {NARRATION_LANGUAGES.map(({ code, label }) => (
                   <option key={code} value={code}>
-                    {label}
+                    {translateUiText(label, language)}
                   </option>
                 ))}
               </select>

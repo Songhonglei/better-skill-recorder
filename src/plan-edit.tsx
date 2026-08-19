@@ -907,7 +907,7 @@ export function ScheduleEditor({
       )}
 
       <div className="sched-days">
-        <span className="sched-lbl">On</span>
+        <span className="sched-lbl">Days</span>
         {DAY_LABELS.map((lbl, d) => (
           <button
             key={d}

@@ -16,7 +16,7 @@ UI clicks, and generalize from your one example, so recording yourself submittin
 form can teach the agent to submit *all* of them.
 
 <p align="center">
-  <img src="docs/images/recorder.png" alt="Skill Recorder capture window: a record button, timer, an optional narration toggle with language and microphone settings, and readiness checks" width="420">
+  <img src="docs/images/recorder.png" alt="Better Skill Recorder capture window in Chinese: a record button, timer, narration language following the interface, microphone and screen settings, and readiness checks" width="420">
   &nbsp;&nbsp;
   <img src="docs/images/library.png" alt="Skill Recorder sessions view: recorded sessions on the left, the reconstructed intent and ordered steps on the right" width="520">
 </p>
@@ -49,6 +49,12 @@ compatibility matrix and validation boundaries.
    steps. Review and edit until it reads right.
 4. ✨ **Create.** From an approved analysis, generate a reusable **Skill** and/or a
    scheduled **Automation**.
+
+Use the compact **EN / 中文** control in the recorder or Sessions window to switch the
+entire interface. The choice is stored on this computer and synchronized across the app's
+windows. Narration follows the interface language by default, while an explicit narration
+language remains available for multilingual workflows. Generated analysis and
+Skill/Automation content stays in its original language.
 
 ## Get started
 
@@ -93,7 +99,9 @@ This adds **Better Skill Recorder** shortcuts to your desktop and Start Menu.
 ### Then record
 
 1. **Grant Screen Recording.** On first launch, macOS asks for Screen Recording permission;
-   grant it and you're ready to record.
+   grant it and you're ready to record. If you replace a locally built, ad-hoc-signed app,
+   macOS may require you to switch its **Screen & System Audio Recording** permission off
+   and on again, then restart the app.
 2. **Record, Analyze, Create.** Do your task, then Analyze. The first time you Analyze,
    Better Skill Recorder offers **Sign in to Copilot** if that is your selected provider
    and you aren't signed in yet. Custom-provider users configure their endpoint under

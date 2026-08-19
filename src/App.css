@@ -2587,6 +2587,10 @@ button:focus-visible,
   opacity: 0.72;
 }
 
+body[data-language="zh-CN"] .hud::before {
+  content: "现场记录  /  01";
+}
+
 .record {
   box-shadow:
     0 18px 34px -24px rgba(7, 35, 33, 0.7),
@@ -4219,4 +4223,105 @@ button:focus-visible,
   border-color: var(--brand);
   color: var(--brand-ink);
   background: var(--signal-dim);
+}
+
+/* Global bilingual control: a compact instrument toggle shared by the recorder
+   and library windows. It deliberately reads as part of the product chrome, not
+   as a generic settings dropdown. */
+.language-switcher {
+  position: fixed;
+  top: 13px;
+  right: 16px;
+  z-index: 80;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 28px;
+  padding: 3px;
+  border: 1px solid rgba(9, 50, 47, 0.12);
+  border-radius: 999px;
+  background: rgba(247, 249, 247, 0.86);
+  box-shadow: 0 8px 24px -16px rgba(4, 31, 29, 0.62), inset 0 1px 0 rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(16px) saturate(1.25);
+  -webkit-backdrop-filter: blur(16px) saturate(1.25);
+}
+
+.language-switcher-label {
+  padding: 0 5px 0 7px;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.language-switcher button {
+  min-width: 34px;
+  height: 22px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: color 140ms ease, background 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.language-switcher button:hover {
+  color: var(--text);
+}
+
+.language-switcher button:active {
+  transform: scale(0.96);
+}
+
+.language-switcher button.active {
+  background: var(--text);
+  color: #dffbf5;
+  box-shadow: 0 4px 12px -7px rgba(3, 30, 28, 0.9);
+}
+
+.language-switcher button:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+body[data-route="recorder"] .language-switcher {
+  top: 8px;
+  right: 10px;
+  min-height: 24px;
+  padding: 2px;
+}
+
+body[data-route="recorder"] .language-switcher-label {
+  display: none;
+}
+
+body[data-route="recorder"] .language-switcher button {
+  min-width: 31px;
+  height: 20px;
+  padding-inline: 6px;
+  font-size: 8px;
+}
+
+body[data-language="zh-CN"] {
+  font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+}
+
+body[data-language="zh-CN"] .eyebrow,
+body[data-language="zh-CN"] .provider-live small,
+body[data-language="zh-CN"] .lib-brand small,
+body[data-language="zh-CN"] .language-switcher {
+  letter-spacing: 0.08em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .language-switcher button {
+    transition: none;
+  }
 }

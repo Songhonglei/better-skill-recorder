@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { Library } from "./Library";
 import { Recorder } from "./Recorder";
 import { RecordingControls } from "./RecordingControls";
+import { LanguageProvider, LanguageSwitcher, UiLocalizer } from "./i18n";
 import "./App.css";
 
 const root = document.getElementById("root");
@@ -20,6 +21,11 @@ document.body.dataset.route = isLibrary
 
 createRoot(root).render(
   <React.StrictMode>
-    {isLibrary ? <Library /> : isRecordingControls ? <RecordingControls /> : <Recorder />}
+    <LanguageProvider>
+      <UiLocalizer>
+        {!isRecordingControls && <LanguageSwitcher />}
+        {isLibrary ? <Library /> : isRecordingControls ? <RecordingControls /> : <Recorder />}
+      </UiLocalizer>
+    </LanguageProvider>
   </React.StrictMode>,
 );

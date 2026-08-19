@@ -9,8 +9,10 @@ import {
   narrationLanguageLabel,
 } from "../common/narration";
 import { formatMs } from "./format";
+import { translateUiText, useLanguage } from "./i18n";
 
 export function RecordingControls() {
+  const { language } = useLanguage();
   const [status, setStatus] = useState<RecorderStatus | null>(null);
   const [microphoneSettings, setMicrophoneSettings] =
     useState<MicrophoneSettingsStatus | null>(null);
@@ -171,8 +173,9 @@ export function RecordingControls() {
   const lifecycleBusy = finishPending !== null || transitionBusy || !recording;
   const microphoneOn = status?.microphone.state === "on";
   const microphoneError = status?.microphone.state === "error";
-  const narrationLanguage = narrationLanguageLabel(
-    status?.narrationLanguage ?? DEFAULT_NARRATION_LANGUAGE,
+  const narrationLanguage = translateUiText(
+    narrationLanguageLabel(status?.narrationLanguage ?? DEFAULT_NARRATION_LANGUAGE),
+    language,
   );
   const activeMicrophoneLabel =
     status?.microphone.activeDevice?.label ??
@@ -206,6 +209,7 @@ export function RecordingControls() {
   return (
     <div
       className={`recording-controls ${confirmDiscard ? "expanded" : ""}`}
+      data-language={language}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && confirmDiscard) setConfirmDiscard(false);
       }}

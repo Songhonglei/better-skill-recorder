@@ -42,6 +42,7 @@ import { formatBytes, formatDur, formatWhen, shortLabel } from "./format";
 import { skillPlacementModel, skillTargetFor } from "./skill-placement";
 import { SensitiveReview } from "./SensitiveReview";
 import { ProviderSettings } from "./ProviderSettings";
+import { useLanguage } from "./i18n";
 
 type LibraryView = "sessions" | "model";
 
@@ -52,6 +53,7 @@ const RecorderMark = () => (
 );
 
 export function Library() {
+  const { language } = useLanguage();
   const [view, setView] = useState<LibraryView>("sessions");
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -109,7 +111,7 @@ export function Library() {
   const selected = sessions.find((s) => s.id === selectedId) ?? null;
 
   return (
-    <div className="lib">
+    <div className="lib" data-language={language}>
       <aside className="lib-list">
         <div className="lib-brand">
           <RecorderMark />
