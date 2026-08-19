@@ -101,7 +101,9 @@ This adds **Better Skill Recorder** shortcuts to your desktop and Start Menu.
 1. **Grant Screen Recording.** On first launch, macOS asks for Screen Recording permission;
    grant it and you're ready to record. If you replace a locally built, ad-hoc-signed app,
    macOS may require you to switch its **Screen & System Audio Recording** permission off
-   and on again, then restart the app.
+   and on again, then restart the app. Maintainers can use the stable local development
+   signing workflow in [`INSTALL.md`](INSTALL.md#stable-local-package-signing-macos) to avoid
+   changing the app's permission identity on every rebuild.
 2. **Record, Analyze, Create.** Do your task, then Analyze. The first time you Analyze,
    Better Skill Recorder offers **Sign in to Copilot** if that is your selected provider
    and you aren't signed in yet. Custom-provider users configure their endpoint under

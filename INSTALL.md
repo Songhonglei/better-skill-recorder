@@ -235,6 +235,34 @@ npm start
 For hot-reload development, run `npm run dev` after the validated install
 sequence above and `npm run compliance:licenses`.
 
+## Stable local package signing (macOS)
+
+Ad-hoc signatures identify an app by a content-dependent hash, so replacing a local
+package can make macOS ask for Screen Recording permission again. A maintainer can create
+a stable, machine-local code-signing identity once:
+
+```sh
+npm run setup:signing:mac
+npm run dist:app:mac
+```
+
+The setup command creates a private local trust root and a five-year code-signing
+certificate named `Better Skill Recorder Local Development`. The signing private key is
+stored in the current user's login Keychain; generated private-key and PKCS#12 files are
+removed after import and are never written to the repository. macOS may request Keychain
+authorization during the one-time setup or first build.
+
+The macOS package scripts automatically use this identity when it is present and disable
+public timestamping, which is not applicable to a private trust root. Local builds then
+keep the designated requirement anchored to the same certificate across rebuilds. The
+first migration from an ad-hoc build can still require one final Screen Recording
+permission refresh.
+
+This certificate is trusted only on the Mac where it was created. It is not an Apple
+Developer ID certificate, is not notarized, and must not be used for public distribution.
+CI retains the explicitly configured ad-hoc preview behavior. To intentionally build
+ad-hoc on a developer Mac, set `BETTER_SKILL_RECORDER_ALLOW_ADHOC=1`.
+
 The lockfile pins the dependency graph with canonical `registry.npmjs.org` URLs
 and integrity hashes. npm may map those URLs to a configured compatible
 corporate registry. Use `npm ci`, not `npm install`, and do not regenerate the
