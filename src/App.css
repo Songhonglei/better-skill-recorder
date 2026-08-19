@@ -2739,18 +2739,28 @@ body[data-language="zh-CN"] .hud::before {
 .lib-nav-copy {
   min-width: 0;
   display: flex;
-  flex-direction: column;
-  gap: 1px;
+  align-items: baseline;
+  gap: 5px;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .lib-nav-copy strong {
+  flex: 0 0 auto;
   color: inherit;
   font-size: 12.5px;
   font-weight: 600;
   line-height: 1.25;
 }
 
+.lib-nav-model-separator {
+  flex: 0 0 auto;
+  color: var(--faint);
+  font-size: 10px;
+}
+
 .lib-nav-copy small {
+  min-width: 0;
   overflow: hidden;
   color: var(--faint);
   font: 8.5px/1.3 var(--mono);

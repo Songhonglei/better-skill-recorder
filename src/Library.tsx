@@ -129,7 +129,8 @@ export function Library() {
           <button className={view === "model" ? "active" : ""} onClick={() => setView("model")}>
             <span className="lib-nav-icon model" aria-hidden>✦</span>
             <span className="lib-nav-copy">
-              <strong>Model control</strong>
+              <strong>Model management</strong>
+              <span className="lib-nav-model-separator" aria-hidden>·</span>
               <small data-no-localize>
                 {providerSettings?.provider === "openai-compatible"
                   ? providerSettings.model || (language === "zh-CN" ? "自定义端点" : "Custom endpoint")

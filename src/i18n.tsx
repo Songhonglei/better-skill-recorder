@@ -18,6 +18,7 @@ const ZH: Record<string, string> = {
   "CAPTURE → UNDERSTAND → BUILD": "录制 → 理解 → 构建",
   "FIELD RECORDER / 01": "现场记录 / 01",
   "Recordings": "录制记录",
+  "Model management": "模型管理",
   "Model control": "模型控制",
   "Library sections": "会话库分区",
   "RECENT SESSIONS": "最近会话",
