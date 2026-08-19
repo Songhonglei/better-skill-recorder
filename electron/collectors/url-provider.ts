@@ -45,6 +45,7 @@ const CHROMIUM_BROWSERS = new Set<string>([
   "Opera GX",
   "Arc",
   "Chromium",
+  "ego lite",
   "Yandex",
 ]);
 
@@ -86,7 +87,7 @@ function webkitScript(app: string): string {
   );
 }
 
-function osascript(script: string, timeoutMs = 800): Promise<string> {
+function osascript(script: string, timeoutMs = 15_000): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile("osascript", ["-e", script], { timeout: timeoutMs }, (err, stdout) => {
       if (err) reject(err);

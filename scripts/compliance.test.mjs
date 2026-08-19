@@ -658,6 +658,10 @@ test("only supported release targets are packaged", () => {
 
 test("macOS packages declare desktop capture privacy usage", () => {
   assert.match(
+    repoManifest.build.mac.extendInfo.NSAppleEventsUsageDescription,
+    /active browser tab URL/,
+  );
+  assert.match(
     repoManifest.build.mac.extendInfo.NSAudioCaptureUsageDescription,
     /screen-capture framework/,
   );
