@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import type { Analysis, AnalysisStep } from "../common/analysis";
 import type { AgentProviderSettings } from "../common/provider-settings";
@@ -20,9 +20,6 @@ import type {
   SkillPlan,
 } from "../common/skill";
 import {
-  ARCHITECTURES,
-  DEFAULT_TARGET,
-  TARGETS,
   buildTargetFor,
 } from "../common/skill";
 import type { AutomationPlan, BuiltAutomation } from "../common/automation";
@@ -559,7 +556,7 @@ function AnalysisWorkspace({
         ? "automation"
         : "none";
   const [launch, setLaunch] = useState<LaunchTarget>(initialLaunch);
-  const [chosenArch, setChosenArch] = useState<SkillArchitecture>(DEFAULT_TARGET.architecture);
+  const [chosenArch, setChosenArch] = useState<SkillArchitecture>("agent-skill");
   // Set while the user is deliberately canceling, so the aborted run's rejection
   // doesn't surface as an error toast.
   const canceled = useRef(false);
@@ -679,7 +676,6 @@ function AnalysisWorkspace({
   if (launch === "picker") {
     return (
       <TargetPicker
-        startedAt={summary.startedAt}
         onPick={(t) => {
           setChosenArch(t.architecture);
           setLaunch(t.kind);
@@ -694,8 +690,8 @@ function AnalysisWorkspace({
       <SkillBuilderView
         sessionId={sessionId}
         architecture={chosenArch}
-        startedAt={summary.startedAt}
         hasSkill={summary.hasSkill}
+        onBack={() => setLaunch("picker")}
         onClose={() => {
           setLaunch("none");
           void onChanged();
@@ -709,8 +705,8 @@ function AnalysisWorkspace({
       <AutomationBuilderView
         sessionId={sessionId}
         architecture={chosenArch}
-        startedAt={summary.startedAt}
         hasAutomation={summary.hasAutomation}
+        onBack={() => setLaunch("picker")}
         onClose={() => {
           setLaunch("none");
           void onChanged();
@@ -933,17 +929,17 @@ function AnalysisWorkspace({
               <button
                 className="secondary"
                 onClick={() => setLaunch("automation")}
-                title="Open the automation built from this recording"
+                title="Open the scheduled Skill built from this recording"
               >
-                Open automation →
+                Open scheduled Skill →
               </button>
             )}
             <button
               className="record-cta"
               onClick={() => setLaunch("picker")}
-              title="Turn this recording into a skill or an automation"
+              title="Turn this recording into a reusable Skill"
             >
-              {summary.hasSkill || summary.hasAutomation ? "Create another →" : "Create…"}
+              {summary.hasSkill || summary.hasAutomation ? "Create another Skill →" : "Create Skill"}
             </button>
           </div>
         </div>
@@ -970,58 +966,86 @@ function narrationWorkLabel(status: NarrationStatus | null, language: "en" | "zh
 type LaunchTarget = "none" | "picker" | "skill" | "automation";
 
 function launchFootStatus(summary: SessionSummary, language: "en" | "zh-CN"): string {
-  if (summary.hasSkill && summary.hasAutomation) return language === "zh-CN" ? "技能与自动化均已创建" : "Skill & automation created";
+  if (summary.hasSkill && summary.hasAutomation) return language === "zh-CN" ? "两种 Skill 均已创建" : "Both Skill types created";
   if (summary.hasSkill) return language === "zh-CN" ? "技能已创建" : "Skill created";
-  if (summary.hasAutomation) return language === "zh-CN" ? "自动化已创建" : "Automation created";
+  if (summary.hasAutomation) return language === "zh-CN" ? "定时 Skill 已创建" : "Scheduled Skill created";
   return "";
 }
 
-function localizedTarget(target: BuildTarget, language: "en" | "zh-CN"): { label: string; note: string } {
-  if (language === "en") return { label: target.label, note: target.enabled ? target.note : "Coming soon" };
-  const copy: Record<string, { label: string; note: string }> = {
-    "skill:scout": { label: "Scout 技能", note: "按需运行的技能；当描述匹配任务时由 Scout 调用。" },
-    "automation:scout": { label: "Scout 自动化", note: "由触发条件启动、按计划执行的多步骤自动化。" },
-    "skill:cowork": { label: "Cowork 技能", note: "可导出并安装到 Microsoft 365 Copilot（Cowork）的按需技能。" },
-    "skill:agent-skill": { label: "通用智能体技能", note: "适用于任何支持技能的智能体，不绑定特定工具。" },
-    "skill:copilot-studio": { label: "Copilot Studio", note: "即将推出" },
-  };
-  return copy[`${target.kind}:${target.architecture}`] ?? { label: target.label, note: target.enabled ? target.note : "即将推出" };
+const CREATION_TARGETS: readonly BuildTarget[] = [
+  buildTargetFor("agent-skill", "skill"),
+  buildTargetFor("scout", "automation"),
+];
+
+function creationTargetCopy(
+  target: BuildTarget,
+  language: "en" | "zh-CN",
+): { label: string; note: string } {
+  if (target.kind === "skill") {
+    return language === "zh-CN"
+      ? { label: "按需调用的 Skill", note: "需要时由智能体调用，适合可重复执行的任务。" }
+      : { label: "On-demand Skill", note: "Called by an agent when needed for a repeatable task." };
+  }
+  return language === "zh-CN"
+    ? { label: "定时 / 自动触发的 Skill", note: "按计划运行，或由触发条件自动启动。" }
+    : { label: "Scheduled / triggered Skill", note: "Runs on a schedule or starts automatically from a trigger." };
 }
 
-/** "What do you want to build?" — picks both kind and architecture up front. */
+function BuildFlowFooter({
+  onCancel,
+  onPrevious,
+  cancelLabel = "Cancel",
+  status = "",
+  children,
+}: {
+  onCancel: () => void;
+  onPrevious?: () => void;
+  cancelLabel?: "Cancel" | "Close";
+  status?: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="ws-foot build-flow-foot">
+      <div className="build-flow-exit">
+        <button className="ghost" onClick={onCancel}>{cancelLabel}</button>
+        {status && <span className="foot-status">{status}</span>}
+      </div>
+      <div className="ws-foot-actions">
+        {onPrevious && (
+          <button className="ghost build-previous" onClick={onPrevious}>
+            <span aria-hidden>←</span>
+            <span>Previous</span>
+          </button>
+        )}
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** "What do you want to build?" — presents the two user-facing Skill modes. */
 function TargetPicker({
-  startedAt,
   onPick,
   onClose,
 }: {
-  startedAt: number | null;
   onPick: (target: BuildTarget) => void;
   onClose: () => void;
 }) {
   const { language } = useLanguage();
   return (
-    <section className="ws">
-      <div className="ws-head">
-        <div className="ws-titles">
-          <span className="eyebrow">Create</span>
-          <span className="ws-when">{formatWhen(startedAt)}</span>
-        </div>
-        <button className="ghost" onClick={onClose} title="Back to the analysis">
-          Cancel
-        </button>
-      </div>
+    <section className="ws ws-build">
       <div className="ws-body">
         <div className="sb-arch">
           <p className="sb-lead">What do you want to build from this recording?</p>
-          <div className="arch-grid">
-            {TARGETS.map((t) => {
-              const copy = localizedTarget(t, language);
+          <div className="arch-grid creation-kind-grid">
+            {CREATION_TARGETS.map((t) => {
+              const copy = creationTargetCopy(t, language);
               return <button
                 key={`${t.kind}:${t.architecture}`}
-                className="arch-card"
-                disabled={!t.enabled}
-                onClick={() => t.enabled && onPick(t)}
+                className="arch-card creation-kind-card"
+                onClick={() => onPick(t)}
               >
+                <span className="creation-kind-mark" aria-hidden>{t.kind === "skill" ? "01" : "02"}</span>
                 <span className="arch-name">{copy.label}</span>
                 <span className="arch-note">{copy.note}</span>
               </button>;
@@ -1029,6 +1053,7 @@ function TargetPicker({
           </div>
         </div>
       </div>
+      <BuildFlowFooter onCancel={onClose} onPrevious={onClose} />
     </section>
   );
 }
@@ -1040,14 +1065,14 @@ type BuildPhase = "loading" | "ready" | "planning" | "plan" | "creating" | "done
 function SkillBuilderView({
   sessionId,
   architecture: initialArch,
-  startedAt,
   hasSkill,
+  onBack,
   onClose,
 }: {
   sessionId: string;
   architecture: SkillArchitecture;
-  startedAt: number | null;
   hasSkill: boolean;
+  onBack: () => void;
   onClose: () => void;
 }) {
   const { language } = useLanguage();
@@ -1165,23 +1190,25 @@ function SkillBuilderView({
 
   const busy = phase === "planning" || phase === "creating";
 
-  return (
-    <section className="ws">
-      <div className="ws-head">
-        <div className="ws-titles">
-          <span className="eyebrow">{phase === "done" ? "Skill" : "Create skill"}</span>
-          <span className="ws-when">{formatWhen(startedAt)}</span>
-        </div>
-        <button
-          className="ghost"
-          onClick={onClose}
-          disabled={busy}
-          title={phase === "done" ? "View this recording's analysis" : "Back to the analysis"}
-        >
-          {phase === "done" ? "Analysis" : "Close"}
-        </button>
-      </div>
+  const cancelFlow = useCallback(async () => {
+    if (busy) await cancelRun();
+    onClose();
+  }, [busy, cancelRun, onClose]);
 
+  const goPrevious = useCallback(() => {
+    if (phase === "plan") {
+      setPhase("ready");
+      return;
+    }
+    if (phase === "done") {
+      setPhase(plan ? "plan" : "ready");
+      return;
+    }
+    onBack();
+  }, [phase, plan, onBack]);
+
+  return (
+    <section className="ws ws-build">
       <div className="ws-body">
         {error && <AnalysisError error={error} />}
 
@@ -1196,12 +1223,9 @@ function SkillBuilderView({
           <div className="sb-arch">
             <p className="sb-lead">
               {language === "zh-CN"
-                ? `根据这条录制构建 ${archLabel(architecture)} 技能。`
-                : `Build a ${archLabel(architecture)} skill from this recording.`}
+                ? "根据这条录制构建按需调用的 Skill。"
+                : "Build an on-demand Skill from this recording."}
             </p>
-            <button className="record-cta" onClick={() => void runPlan()}>
-              {language === "zh-CN" ? "规划技能 →" : "Plan the skill →"}
-            </button>
           </div>
         )}
 
@@ -1209,9 +1233,6 @@ function SkillBuilderView({
           <div className="status-line">
             <span className="spinner" />
             <span className="status-text">{statusLine || "Working…"}</span>
-            <button className="linky status-cancel" onClick={cancelRun}>
-              Cancel
-            </button>
           </div>
         )}
 
@@ -1260,30 +1281,37 @@ function SkillBuilderView({
             </div>
             <h2 className="sb-title">
               {placement === "install"
-                ? language === "zh-CN"
-                  ? `已添加到 ${skillTargetFor(architecture).installTargetLabel}`
-                  : placementModel.installDoneTitle
+                ? language === "zh-CN" ? "Skill 已添加" : "Skill added"
                 : language === "zh-CN" ? "技能已导出" : "Skill exported"}
             </h2>
             <p>
               <code className="sb-slug">{builtName}</code>{" "}
               {placement === "install"
                 ? language === "zh-CN"
-                  ? `现已存放在 ${skillTargetFor(architecture).installTargetLabel}，会自动加载。`
-                  : placementModel.installDoneMessage
+                  ? "已添加到目标 Skill 目录，会自动加载。"
+                  : "is in the target Skill directory and loads automatically."
                 : language === "zh-CN"
-                  ? `已为 ${archLabel(architecture)} 构建。请将它安装到 ${archLabel(architecture)} 加载技能的位置。`
-                  : `is built for ${archLabel(architecture)}. Install it wherever ${archLabel(architecture)} loads skills.`}
+                  ? "已生成可安装的 Skill 文件，可用于任何支持 Skill 的智能体。"
+                  : "is ready to install in any agent that supports Skills."}
             </p>
             {exportedPath && <p className="sb-path">{exportedPath}</p>}
           </div>
         )}
       </div>
 
-      {phase === "plan" && plan && (
-        <div className="ws-foot">
-          <span className="foot-status" />
-          <div className="ws-foot-actions">
+      <BuildFlowFooter
+        onCancel={() => void cancelFlow()}
+        onPrevious={busy ? () => void cancelRun() : goPrevious}
+        cancelLabel={phase === "done" ? "Close" : "Cancel"}
+        status={phase === "done" ? (language === "zh-CN" ? "技能已创建" : "Skill created") : ""}
+      >
+        {phase === "ready" && (
+          <button className="record-cta" onClick={() => void runPlan()}>
+            {language === "zh-CN" ? "规划 Skill →" : "Plan the Skill →"}
+          </button>
+        )}
+        {phase === "plan" && plan && (
+          <>
             {placementModel.actions.map((action) => (
               <button
                 key={action.placement}
@@ -1302,28 +1330,16 @@ function SkillBuilderView({
                   : action.label}
               </button>
             ))}
-          </div>
-        </div>
-      )}
-
-      {phase === "done" && (
-        <div className="ws-foot">
-          <span className="foot-status">{language === "zh-CN" ? "技能已创建" : "Skill created"}</span>
-          <div className="ws-foot-actions">
-            {exportedPath && (
-              <button className="record-cta" onClick={() => void window.skillRecorder.revealSkill(sessionId)}>
-                {language === "zh-CN" ? "在访达中显示" : "Reveal file"}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+          </>
+        )}
+        {phase === "done" && exportedPath && (
+          <button className="record-cta" onClick={() => void window.skillRecorder.revealSkill(sessionId)}>
+            {language === "zh-CN" ? "在访达中显示" : "Reveal file"}
+          </button>
+        )}
+      </BuildFlowFooter>
     </section>
   );
-}
-
-function archLabel(id: SkillArchitecture): string {
-  return ARCHITECTURES.find((a) => a.id === id)?.label ?? id;
 }
 
 /* --- Automation builder --------------------------------------------------- */
@@ -1331,14 +1347,14 @@ function archLabel(id: SkillArchitecture): string {
 function AutomationBuilderView({
   sessionId,
   architecture: initialArch,
-  startedAt,
   hasAutomation,
+  onBack,
   onClose,
 }: {
   sessionId: string;
   architecture: SkillArchitecture;
-  startedAt: number | null;
   hasAutomation: boolean;
+  onBack: () => void;
   onClose: () => void;
 }) {
   const { language } = useLanguage();
@@ -1351,12 +1367,6 @@ function AutomationBuilderView({
   const [builtName, setBuiltName] = useState("");
   const canceled = useRef(false);
   const inFlight = useRef(false);
-  // The initial architecture can reflect a prior skill choice while a saved automation loads.
-  const automationInstallTargetLabel =
-    phase === "done"
-      ? buildTargetFor(architecture, "automation").installTargetLabel
-      : "";
-
   const updatePlan = useCallback((part: Partial<AutomationPlan>) => {
     setPlan((prev) => (prev ? { ...prev, ...part } : prev));
   }, []);
@@ -1439,23 +1449,25 @@ function AutomationBuilderView({
 
   const busy = phase === "planning" || phase === "creating";
 
-  return (
-    <section className="ws">
-      <div className="ws-head">
-        <div className="ws-titles">
-          <span className="eyebrow">{phase === "done" ? "Automation" : "Create automation"}</span>
-          <span className="ws-when">{formatWhen(startedAt)}</span>
-        </div>
-        <button
-          className="ghost"
-          onClick={onClose}
-          disabled={busy}
-          title={phase === "done" ? "View this recording's analysis" : "Back to the analysis"}
-        >
-          {phase === "done" ? "Analysis" : "Close"}
-        </button>
-      </div>
+  const cancelFlow = useCallback(async () => {
+    if (busy) await cancelRun();
+    onClose();
+  }, [busy, cancelRun, onClose]);
 
+  const goPrevious = useCallback(() => {
+    if (phase === "plan") {
+      setPhase("ready");
+      return;
+    }
+    if (phase === "done") {
+      setPhase(plan ? "plan" : "ready");
+      return;
+    }
+    onBack();
+  }, [phase, plan, onBack]);
+
+  return (
+    <section className="ws ws-build">
       <div className="ws-body">
         {error && <AnalysisError error={error} />}
 
@@ -1470,12 +1482,9 @@ function AutomationBuilderView({
           <div className="sb-arch">
             <p className="sb-lead">
               {language === "zh-CN"
-                ? `根据这条录制构建 ${archLabel(architecture)} 自动化。`
-                : `Build a ${archLabel(architecture)} automation from this recording.`}
+                ? "根据这条录制构建定时 / 自动触发的 Skill。"
+                : "Build a scheduled or automatically triggered Skill from this recording."}
             </p>
-            <button className="record-cta" onClick={() => void runPlan()}>
-              {language === "zh-CN" ? "规划自动化 →" : "Plan the automation →"}
-            </button>
           </div>
         )}
 
@@ -1483,9 +1492,6 @@ function AutomationBuilderView({
           <div className="status-line">
             <span className="spinner" />
             <span className="status-text">{statusLine || "Working…"}</span>
-            <button className="linky status-cancel" onClick={cancelRun}>
-              Cancel
-            </button>
           </div>
         )}
 
@@ -1527,7 +1533,7 @@ function AutomationBuilderView({
             </div>
 
             <div className="sb-sec">
-              <span className="eyebrow">What the automation will do</span>
+              <span className="eyebrow">What the scheduled Skill will do</span>
               <p className="sb-refine-hint">
                 Click any step to edit, or a highlighted value to change it. Reorder, add or remove as needed.
               </p>
@@ -1546,53 +1552,52 @@ function AutomationBuilderView({
             <div className="sb-check" aria-hidden>
               ✓
             </div>
-            <h2 className="sb-title">Automation ready</h2>
+            <h2 className="sb-title">Scheduled Skill ready</h2>
             <p>
               <code className="sb-slug">{builtName}</code>{" "}
               {language === "zh-CN"
-                ? `已为 ${archLabel(architecture)} 构建。`
-                : `is built for ${archLabel(architecture)}.`}
+                ? "已生成定时 / 自动触发的 Skill 文件包。"
+                : "is ready as a scheduled or automatically triggered Skill bundle."}
             </p>
             {exportedPath && <p className="sb-path">{exportedPath}</p>}
             <p className="sb-import-hint">
               {language === "zh-CN"
-                ? `将其导入 ${automationInstallTargetLabel}：打开 ${automationInstallTargetLabel} → Automations → Import，然后选择此文件包文件夹。`
-                : `Import it into ${automationInstallTargetLabel}: open ${automationInstallTargetLabel} → Automations → Import, and choose this bundle folder.`}
+                ? "文件包已保存，可在支持定时或触发器的智能体中导入。"
+                : "The bundle is saved and can be imported into an agent that supports schedules or triggers."}
             </p>
           </div>
         )}
       </div>
 
-      {phase === "plan" && plan && (
-        <div className="ws-foot">
-          <span className="foot-status" />
-          <div className="ws-foot-actions">
-            <button
-              className="record-cta"
-              onClick={() => void create()}
-              title="Create and export the automation bundle"
-            >
-              Create &amp; export automation
-            </button>
-          </div>
-        </div>
-      )}
-
-      {phase === "done" && (
-        <div className="ws-foot">
-          <span className="foot-status">{language === "zh-CN" ? "自动化已创建" : "Automation created"}</span>
-          <div className="ws-foot-actions">
-            {exportedPath && (
-              <button
-                className="record-cta"
-                onClick={() => void window.skillRecorder.revealAutomation(sessionId)}
-              >
-                {language === "zh-CN" ? "显示文件包" : "Reveal bundle"}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+      <BuildFlowFooter
+        onCancel={() => void cancelFlow()}
+        onPrevious={busy ? () => void cancelRun() : goPrevious}
+        cancelLabel={phase === "done" ? "Close" : "Cancel"}
+        status={phase === "done" ? (language === "zh-CN" ? "定时 Skill 已创建" : "Scheduled Skill created") : ""}
+      >
+        {phase === "ready" && (
+          <button className="record-cta" onClick={() => void runPlan()}>
+            {language === "zh-CN" ? "规划 Skill →" : "Plan the Skill →"}
+          </button>
+        )}
+        {phase === "plan" && plan && (
+          <button
+            className="record-cta"
+            onClick={() => void create()}
+            title="Create the scheduled Skill bundle"
+          >
+            Create scheduled Skill
+          </button>
+        )}
+        {phase === "done" && exportedPath && (
+          <button
+            className="record-cta"
+            onClick={() => void window.skillRecorder.revealAutomation(sessionId)}
+          >
+            Reveal bundle
+          </button>
+        )}
+      </BuildFlowFooter>
     </section>
   );
 }

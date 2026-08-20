@@ -2559,6 +2559,9 @@ button:focus-visible,
 
 .ws-foot-actions {
   display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
@@ -3511,6 +3514,29 @@ body[data-language="zh-CN"] .hud::before {
   width: 100%;
 }
 
+.ws-build .ws-body {
+  padding-top: 72px;
+}
+
+.build-flow-foot {
+  flex: 0 0 auto;
+  background: rgba(247, 248, 242, 0.9);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.build-flow-exit {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.build-previous {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .sb-lead {
   margin: 0;
   font-size: 15px;
@@ -3523,6 +3549,11 @@ body[data-language="zh-CN"] .hud::before {
   gap: 10px;
 }
 
+.creation-kind-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
 .arch-card {
   display: flex;
   flex-direction: column;
@@ -3533,6 +3564,45 @@ body[data-language="zh-CN"] .hud::before {
   border: 1px solid var(--line);
   border-radius: 11px;
   padding: 13px 14px;
+}
+
+.creation-kind-card {
+  position: relative;
+  min-height: 138px;
+  padding: 22px 20px 20px;
+  overflow: hidden;
+}
+
+.creation-kind-card::after {
+  content: "→";
+  position: absolute;
+  right: 18px;
+  bottom: 14px;
+  color: var(--faint);
+  font: 16px/1 var(--mono);
+  transition: color 140ms ease, transform 140ms ease;
+}
+
+.creation-kind-card:hover::after {
+  color: var(--signal);
+  transform: translateX(3px);
+}
+
+.creation-kind-mark {
+  color: var(--brand-ink);
+  font: 9px/1 var(--mono);
+  letter-spacing: 0.12em;
+}
+
+.creation-kind-card .arch-name {
+  margin-top: 8px;
+  font-size: 16px;
+}
+
+.creation-kind-card .arch-note {
+  max-width: 250px;
+  padding-right: 22px;
+  line-height: 1.5;
 }
 
 .arch-card:not(:disabled):hover {
@@ -3562,6 +3632,20 @@ body[data-language="zh-CN"] .hud::before {
 
 .sb-arch .record-cta {
   align-self: flex-start;
+}
+
+@media (max-width: 760px) {
+  .creation-kind-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .creation-kind-card {
+    min-height: 116px;
+  }
+
+  .build-flow-foot {
+    align-items: flex-end;
+  }
 }
 
 /* Plan view */
