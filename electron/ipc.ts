@@ -6,6 +6,7 @@ import {
   type OpenDialogOptions,
   type SaveDialogOptions,
 } from "electron";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
@@ -24,6 +25,9 @@ import type {
   SkillCreateResult,
   SkillPlacement,
   SkillPlanResult,
+  UiOutputLanguage,
+  UniversalSkillPackageResult,
+  UniversalSkillPackageSummary,
 } from "../common/ipc";
 import { IPC } from "../common/ipc";
 import type { AutomationPlan } from "../common/automation";
@@ -41,7 +45,7 @@ import type { AudioRecorder } from "./audio/recorder";
 import type { NarrationManager } from "./narration/manager";
 import type { RecorderController } from "./recorder/controller";
 import type { ScreenSourceService } from "./video/sources";
-import { isValidSessionId } from "./recorder/session-store";
+import { isValidSessionId, sessionDir } from "./recorder/session-store";
 import {
   INACTIVE_FRAME_REDACTOR,
   OcrFrameRedactor,
@@ -51,6 +55,7 @@ import type { SensitiveModelManager } from "./sensitive/model-manager";
 import { buildRedactor, loadSensitiveReport, saveSensitiveReport, scanSession } from "./sensitive/scanner";
 import { deleteSession, listSessions } from "./sessions";
 import { loadPersistedSkill, SkillBuilder, type SkillTarget } from "./skillbuilder/builder";
+import { writeUniversalSkillPackage } from "./skillbuilder/universal-package";
 
 const log = createLogger("IPC");
 
@@ -434,6 +439,63 @@ export function registerIpc(
       }
     },
   );
+
+  ipcMain.handle(
+    IPC.exportUniversalSkill,
+    async (
+      event,
+      sessionId: string,
+      language?: UiOutputLanguage,
+    ): Promise<UniversalSkillPackageResult> => {
+      if (!isValidSessionId(sessionId)) return { ok: false, error: "Unknown session." };
+      const skill = loadPersistedSkill(sessionId);
+      if (!skill) {
+        return {
+          ok: false,
+          error:
+            language === "zh-CN"
+              ? "请先生成按需调用的 Skill，再导出通用包。"
+              : "Create the on-demand Skill before exporting a universal package.",
+        };
+      }
+      try {
+        const win = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+        const opts: OpenDialogOptions = {
+          title: language === "zh-CN" ? "导出通用 Skill 包" : "Export universal Skill package",
+          defaultPath: path.join(os.homedir(), "Downloads"),
+          properties: ["openDirectory", "createDirectory"],
+        };
+        const selected = win
+          ? await dialog.showOpenDialog(win, opts)
+          : await dialog.showOpenDialog(opts);
+        if (selected.canceled || selected.filePaths.length === 0) return { ok: false, canceled: true };
+        const summary = await writeUniversalSkillPackage(skill, selected.filePaths[0]);
+        writeFileSync(
+          path.join(sessionDir(sessionId), "universal-package.json"),
+          JSON.stringify(summary, null, 2),
+        );
+        return { ok: true, package: summary };
+      } catch (err) {
+        const error = err instanceof Error ? err.message : String(err);
+        log.warn("universal skill export failed:", error);
+        return { ok: false, error };
+      }
+    },
+  );
+
+  ipcMain.handle(IPC.revealUniversalSkill, (_event, sessionId: string) => {
+    if (!isValidSessionId(sessionId)) return { ok: false };
+    try {
+      const file = path.join(sessionDir(sessionId), "universal-package.json");
+      if (!existsSync(file)) return { ok: false };
+      const summary = JSON.parse(readFileSync(file, "utf8")) as UniversalSkillPackageSummary;
+      if (!summary.zipPath || !existsSync(summary.zipPath)) return { ok: false };
+      shell.showItemInFolder(summary.zipPath);
+      return { ok: true };
+    } catch {
+      return { ok: false };
+    }
+  });
 
   ipcMain.handle(IPC.getSkill, (_event, sessionId: string) =>
     isValidSessionId(sessionId) ? loadPersistedSkill(sessionId) : null,

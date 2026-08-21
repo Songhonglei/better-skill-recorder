@@ -227,6 +227,34 @@ export interface SkillCreateResult {
   error?: string;
 }
 
+/** Audit summary for a portable, shareable Skill folder and its clean ZIP. */
+export interface UniversalSkillPackageSummary {
+  name: string;
+  /** Wrapper directory containing both the publishable folder and ZIP. */
+  packageRoot: string;
+  /** ClawHub-ready directory whose basename matches the SKILL.md `name`. */
+  skillDir: string;
+  /** Clean archive for direct sharing; expands to `<name>/...`. */
+  zipPath: string;
+  /** Allowlisted relative files included in both outputs. */
+  files: string[];
+  configuredValueCount: number;
+  protectedSecretCount: number;
+  portablePathCount: number;
+  removedAllowedToolCount: number;
+  requiredBins: string[];
+  /** Non-blocking portability notes; never contains captured values. */
+  warnings: string[];
+}
+
+export interface UniversalSkillPackageResult {
+  ok: boolean;
+  package?: UniversalSkillPackageSummary;
+  /** True when the destination picker was dismissed. */
+  canceled?: boolean;
+  error?: string;
+}
+
 /* --- Automation Builder --------------------------------------------------- */
 
 /** Streamed to the renderer while the automation-builder agent works. */
@@ -478,6 +506,8 @@ export const IPC = {
   exportDebugBundle: "sessions:export-debug",
   buildSkill: "skill:build",
   createSkill: "skill:create",
+  exportUniversalSkill: "skill:export-universal",
+  revealUniversalSkill: "skill:reveal-universal",
   getSkill: "skill:get",
   cancelSkill: "skill:cancel",
   revealSkill: "skill:reveal",
@@ -588,6 +618,13 @@ export interface SkillRecorderApi {
    * only option for Cowork). Defaults to `"install"`.
    */
   createSkill(sessionId: string, plan: SkillPlan, placement?: SkillPlacement): Promise<SkillCreateResult>;
+  /** Build a sanitized, portable Skill directory plus clean ZIP from a finished Skill. */
+  exportUniversalSkill(
+    sessionId: string,
+    language?: UiOutputLanguage,
+  ): Promise<UniversalSkillPackageResult>;
+  /** Reveal the latest universal package exported for this recording. */
+  revealUniversalSkill(sessionId: string): Promise<{ ok: boolean }>;
   /** Load a previously built skill for a session, if any. */
   getSkill(sessionId: string): Promise<BuiltSkill | null>;
   /** Abort an in-flight build. */

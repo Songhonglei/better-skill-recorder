@@ -11,6 +11,7 @@ import type {
   SessionSummary,
   SkillBuildProgress,
   SkillPlacement,
+  UniversalSkillPackageSummary,
 } from "../common/ipc";
 import { isCopilotSignedOutError } from "../common/ipc";
 import type {
@@ -1090,6 +1091,8 @@ function SkillBuilderView({
   const [error, setError] = useState<string | null>(null);
   const [exportedPath, setExportedPath] = useState("");
   const [builtName, setBuiltName] = useState("");
+  const [universalPackage, setUniversalPackage] = useState<UniversalSkillPackageSummary | null>(null);
+  const [packagingUniversal, setPackagingUniversal] = useState(false);
   const canceled = useRef(false);
   const inFlight = useRef(false);
   const [placement, setPlacement] = useState<SkillPlacement>(() => defaultPlacementFor(initialArch));
@@ -1179,6 +1182,18 @@ function SkillBuilderView({
     },
     [sessionId, plan],
   );
+
+  const exportUniversalPackage = useCallback(async () => {
+    setPackagingUniversal(true);
+    setError(null);
+    const res = await window.skillRecorder.exportUniversalSkill(sessionId, language);
+    setPackagingUniversal(false);
+    if (res.ok && res.package) {
+      setUniversalPackage(res.package);
+      return;
+    }
+    if (!res.canceled) setError(res.error ?? "Could not export the universal Skill package");
+  }, [sessionId, language]);
 
   const cancelRun = useCallback(async () => {
     canceled.current = true;
@@ -1295,6 +1310,43 @@ function SkillBuilderView({
                   : "is ready to install in any agent that supports Skills."}
             </p>
             {exportedPath && <p className="sb-path">{exportedPath}</p>}
+            {universalPackage && (
+              <section className="universal-passport" aria-label={language === "zh-CN" ? "通用 Skill 包检查结果" : "Universal Skill package checks"}>
+                <div className="universal-passport-head">
+                  <span className="universal-passport-seal" aria-hidden>✓</span>
+                  <div>
+                    <strong>{language === "zh-CN" ? "通用包检查通过" : "Universal package ready"}</strong>
+                    <p>
+                      {language === "zh-CN"
+                        ? "标准目录与干净 ZIP 已同步生成，可直接分享或发布到 ClawHub。"
+                        : "A standard folder and clean ZIP are ready to share or publish to ClawHub."}
+                    </p>
+                  </div>
+                </div>
+                <div className="universal-check-grid">
+                  <div><span>01</span><strong>{language === "zh-CN" ? "结构标准" : "Standard shape"}</strong><small>SKILL.md · v1.0.0</small></div>
+                  <div><span>02</span><strong>{language === "zh-CN" ? "敏感值隔离" : "Secrets isolated"}</strong><small>{universalPackage.protectedSecretCount}</small></div>
+                  <div><span>03</span><strong>{language === "zh-CN" ? "固定值配置化" : "Values configured"}</strong><small>{universalPackage.configuredValueCount}</small></div>
+                  <div><span>04</span><strong>{language === "zh-CN" ? "干净归档" : "Clean archive"}</strong><small>{universalPackage.files.length} {language === "zh-CN" ? "个白名单文件" : "allowlisted files"}</small></div>
+                </div>
+                {universalPackage.requiredBins.length > 0 && (
+                  <p className="universal-package-note">
+                    {language === "zh-CN" ? "运行依赖：" : "Runtime dependencies: "}
+                    <code>{universalPackage.requiredBins.join(" · ")}</code>
+                  </p>
+                )}
+                {universalPackage.warnings.map((warning) => (
+                  <p className="universal-package-warning" key={warning}>
+                    {language === "zh-CN"
+                      ? warning.includes("macOS")
+                        ? "此 Skill 仍包含面向 macOS 的命令；发给其他 Mac 可以使用，跨平台前需复核。"
+                        : "指令中仍提到了特定宿主或集成，发布前建议人工复核。"
+                      : warning}
+                  </p>
+                ))}
+                <p className="sb-path universal-package-path">{universalPackage.zipPath}</p>
+              </section>
+            )}
           </div>
         )}
       </div>
@@ -1332,10 +1384,30 @@ function SkillBuilderView({
             ))}
           </>
         )}
-        {phase === "done" && exportedPath && (
-          <button className="record-cta" onClick={() => void window.skillRecorder.revealSkill(sessionId)}>
-            {language === "zh-CN" ? "在访达中显示" : "Reveal file"}
-          </button>
+        {phase === "done" && (
+          <>
+            {exportedPath && (
+              <button className="ghost" onClick={() => void window.skillRecorder.revealSkill(sessionId)}>
+                {language === "zh-CN" ? "显示原始 Skill" : "Reveal original Skill"}
+              </button>
+            )}
+            <button
+              className={universalPackage ? "ghost" : "record-cta"}
+              disabled={packagingUniversal}
+              onClick={() => void exportUniversalPackage()}
+            >
+              {packagingUniversal
+                ? language === "zh-CN" ? "正在检查并打包…" : "Checking and packaging…"
+                : universalPackage
+                  ? language === "zh-CN" ? "重新导出通用包…" : "Export again…"
+                  : language === "zh-CN" ? "导出通用 Skill 包" : "Export universal Skill package"}
+            </button>
+            {universalPackage && (
+              <button className="record-cta" onClick={() => void window.skillRecorder.revealUniversalSkill(sessionId)}>
+                {language === "zh-CN" ? "显示通用包" : "Reveal universal package"}
+              </button>
+            )}
+          </>
         )}
       </BuildFlowFooter>
     </section>
