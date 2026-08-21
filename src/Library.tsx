@@ -22,6 +22,7 @@ import type {
 } from "../common/skill";
 import {
   buildTargetFor,
+  normalizeSkillPlanTerminology,
 } from "../common/skill";
 import type { AutomationPlan, BuiltAutomation } from "../common/automation";
 import {
@@ -968,7 +969,7 @@ type LaunchTarget = "none" | "picker" | "skill" | "automation";
 
 function launchFootStatus(summary: SessionSummary, language: "en" | "zh-CN"): string {
   if (summary.hasSkill && summary.hasAutomation) return language === "zh-CN" ? "两种 Skill 均已创建" : "Both Skill types created";
-  if (summary.hasSkill) return language === "zh-CN" ? "技能已创建" : "Skill created";
+  if (summary.hasSkill) return language === "zh-CN" ? "Skill 已创建" : "Skill created";
   if (summary.hasAutomation) return language === "zh-CN" ? "定时 Skill 已创建" : "Scheduled Skill created";
   return "";
 }
@@ -1122,7 +1123,7 @@ function SkillBuilderView({
         // We don't persist how it was placed, so reopening infers the architecture's
         // current default placement from the manifest.
         setPlacement(defaultPlacementFor(s.architecture));
-        if (s.plan) setPlan(s.plan);
+        if (s.plan) setPlan(normalizeSkillPlanTerminology(s.plan));
         setPhase("done");
       } else if (hasSkill) {
         // We expected a skill but couldn't load it; fall back to the ready screen.
@@ -1149,7 +1150,7 @@ function SkillBuilderView({
     const res = await window.skillRecorder.buildSkill({ sessionId, architecture, language });
     inFlight.current = false;
     if (res.ok && res.plan) {
-      setPlan(res.plan);
+      setPlan(normalizeSkillPlanTerminology(res.plan));
       setPhase("plan");
     } else if (!canceled.current) {
       setError(res.error ?? "Planning failed");
@@ -1171,6 +1172,7 @@ function SkillBuilderView({
         setBuiltName(res.skill.name);
         setExportedPath(res.path ?? res.skill.exportedPath ?? "");
         setPlacement(res.placement ?? which);
+        setUniversalPackage(null);
         setPhase("done");
       } else if (res.canceled) {
         // User dismissed the export folder picker — quietly return to the plan.
@@ -1297,7 +1299,7 @@ function SkillBuilderView({
             <h2 className="sb-title">
               {placement === "install"
                 ? language === "zh-CN" ? "Skill 已添加" : "Skill added"
-                : language === "zh-CN" ? "技能已导出" : "Skill exported"}
+                : language === "zh-CN" ? "Skill 已导出" : "Skill exported"}
             </h2>
             <p>
               <code className="sb-slug">{builtName}</code>{" "}
@@ -1309,43 +1311,16 @@ function SkillBuilderView({
                   ? "已生成可安装的 Skill 文件，可用于任何支持 Skill 的智能体。"
                   : "is ready to install in any agent that supports Skills."}
             </p>
-            {exportedPath && <p className="sb-path">{exportedPath}</p>}
             {universalPackage && (
-              <section className="universal-passport" aria-label={language === "zh-CN" ? "通用 Skill 包检查结果" : "Universal Skill package checks"}>
-                <div className="universal-passport-head">
-                  <span className="universal-passport-seal" aria-hidden>✓</span>
-                  <div>
-                    <strong>{language === "zh-CN" ? "通用包检查通过" : "Universal package ready"}</strong>
-                    <p>
-                      {language === "zh-CN"
-                        ? "标准目录与干净 ZIP 已同步生成，可直接分享或发布到 ClawHub。"
-                        : "A standard folder and clean ZIP are ready to share or publish to ClawHub."}
-                    </p>
-                  </div>
-                </div>
-                <div className="universal-check-grid">
-                  <div><span>01</span><strong>{language === "zh-CN" ? "结构标准" : "Standard shape"}</strong><small>SKILL.md · v1.0.0</small></div>
-                  <div><span>02</span><strong>{language === "zh-CN" ? "敏感值隔离" : "Secrets isolated"}</strong><small>{universalPackage.protectedSecretCount}</small></div>
-                  <div><span>03</span><strong>{language === "zh-CN" ? "固定值配置化" : "Values configured"}</strong><small>{universalPackage.configuredValueCount}</small></div>
-                  <div><span>04</span><strong>{language === "zh-CN" ? "干净归档" : "Clean archive"}</strong><small>{universalPackage.files.length} {language === "zh-CN" ? "个白名单文件" : "allowlisted files"}</small></div>
-                </div>
-                {universalPackage.requiredBins.length > 0 && (
-                  <p className="universal-package-note">
-                    {language === "zh-CN" ? "运行依赖：" : "Runtime dependencies: "}
-                    <code>{universalPackage.requiredBins.join(" · ")}</code>
-                  </p>
-                )}
-                {universalPackage.warnings.map((warning) => (
-                  <p className="universal-package-warning" key={warning}>
-                    {language === "zh-CN"
-                      ? warning.includes("macOS")
-                        ? "此 Skill 仍包含面向 macOS 的命令；发给其他 Mac 可以使用，跨平台前需复核。"
-                        : "指令中仍提到了特定宿主或集成，发布前建议人工复核。"
-                      : warning}
-                  </p>
-                ))}
-                <p className="sb-path universal-package-path">{universalPackage.zipPath}</p>
-              </section>
+              <div className="universal-ready" role="status">
+                <span aria-hidden>✓</span>
+                <p>
+                  <strong>{language === "zh-CN" ? "通用 Skill 包已就绪" : "Universal Skill package ready"}</strong>
+                  {language === "zh-CN"
+                    ? "已完成配置清理，可直接分享或上传至 ClawHub。"
+                    : "Configuration was cleaned and the ZIP is ready to share or upload to ClawHub."}
+                </p>
+              </div>
             )}
           </div>
         )}
@@ -1355,7 +1330,7 @@ function SkillBuilderView({
         onCancel={() => void cancelFlow()}
         onPrevious={busy ? () => void cancelRun() : goPrevious}
         cancelLabel={phase === "done" ? "Close" : "Cancel"}
-        status={phase === "done" ? (language === "zh-CN" ? "技能已创建" : "Skill created") : ""}
+        status={phase === "done" ? (language === "zh-CN" ? "Skill 已创建" : "Skill created") : ""}
       >
         {phase === "ready" && (
           <button className="record-cta" onClick={() => void runPlan()}>
@@ -1364,47 +1339,55 @@ function SkillBuilderView({
         )}
         {phase === "plan" && plan && (
           <>
-            {placementModel.actions.map((action) => (
-              <button
-                key={action.placement}
-                className={action.primary ? "record-cta" : "ghost"}
-                onClick={() => void place(action.placement)}
-                title={language === "zh-CN"
-                  ? action.placement === "install"
-                    ? `添加到 ${skillTargetFor(architecture).installTargetLabel} 并自动加载`
-                    : "将技能下载到你选择的文件夹"
-                  : action.title}
-              >
-                {language === "zh-CN"
-                  ? action.placement === "install"
-                    ? `添加到 ${skillTargetFor(architecture).installTargetLabel}`
-                    : action.primary ? "导出技能" : "导出…"
-                  : action.label}
-              </button>
-            ))}
+            {builtName ? (
+              <>
+                <button className="ghost" onClick={() => setPhase("done")}>
+                  {language === "zh-CN" ? "查看 Skill" : "View Skill"}
+                </button>
+                <button className="record-cta" onClick={() => void place(placement)}>
+                  {language === "zh-CN" ? "重新创建 Skill" : "Recreate Skill"}
+                </button>
+              </>
+            ) : placementModel.actions.map((action) => (
+                <button
+                  key={action.placement}
+                  className={action.primary ? "record-cta" : "ghost"}
+                  onClick={() => void place(action.placement)}
+                  title={language === "zh-CN"
+                    ? action.placement === "install"
+                      ? `添加到 ${skillTargetFor(architecture).installTargetLabel} 并自动加载`
+                      : "将 Skill 下载到你选择的文件夹"
+                    : action.title}
+                >
+                  {language === "zh-CN"
+                    ? action.placement === "install"
+                      ? `添加到 ${skillTargetFor(architecture).installTargetLabel}`
+                      : action.primary ? "导出 Skill" : "导出…"
+                    : action.label}
+                </button>
+              ))}
           </>
         )}
         {phase === "done" && (
           <>
             {exportedPath && (
               <button className="ghost" onClick={() => void window.skillRecorder.revealSkill(sessionId)}>
-                {language === "zh-CN" ? "显示原始 Skill" : "Reveal original Skill"}
+                {language === "zh-CN" ? "查看 Skill" : "View Skill"}
               </button>
             )}
-            <button
-              className={universalPackage ? "ghost" : "record-cta"}
-              disabled={packagingUniversal}
-              onClick={() => void exportUniversalPackage()}
-            >
-              {packagingUniversal
-                ? language === "zh-CN" ? "正在检查并打包…" : "Checking and packaging…"
-                : universalPackage
-                  ? language === "zh-CN" ? "重新导出通用包…" : "Export again…"
-                  : language === "zh-CN" ? "导出通用 Skill 包" : "Export universal Skill package"}
-            </button>
-            {universalPackage && (
+            {universalPackage ? (
               <button className="record-cta" onClick={() => void window.skillRecorder.revealUniversalSkill(sessionId)}>
-                {language === "zh-CN" ? "显示通用包" : "Reveal universal package"}
+                {language === "zh-CN" ? "查看通用 Skill 包" : "View universal Skill package"}
+              </button>
+            ) : (
+              <button
+                className="record-cta"
+                disabled={packagingUniversal}
+                onClick={() => void exportUniversalPackage()}
+              >
+                {packagingUniversal
+                  ? language === "zh-CN" ? "正在检查并打包…" : "Checking and packaging…"
+                  : language === "zh-CN" ? "导出通用 Skill 包" : "Export universal Skill package"}
               </button>
             )}
           </>

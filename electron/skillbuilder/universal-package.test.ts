@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -24,6 +24,7 @@ function sampleSkill() {
     allowedTools: ["Bash(gh *)", "Read"],
     body: [
       "Use {{repo}} and authenticate with {{api_key}}.",
+      "The captured repository was owner/project and must not remain in a shared package.",
       "Read the local template at {{template_path}}.",
       "Run `gh pr list -R {{repo}}` and summarize the result.",
     ].join("\n\n"),
@@ -59,9 +60,10 @@ test("universal package configures fixed values and keeps secrets out of every f
   assert.doesNotMatch(markdown, /allowed-tools/);
   assert.doesNotMatch(all, new RegExp(secret));
   assert.doesNotMatch(all, /\/Users\/alice/);
-  assert.match(config, /"repo": "owner\/project"/);
+  assert.match(config, /"repo": "<configure-value>"/);
+  assert.doesNotMatch(all, /owner\/project/);
   assert.match(config, /"template_path": "<configure-path>"/);
-  assert.match(config, /"api_key": "<set-via-env:API_KEY>"/);
+  assert.doesNotMatch(config, /api_key/i);
   assert.match(env, /^API_KEY=$/m);
   assert.deepEqual(prepared.requiredBins, ["gh"]);
   assert.equal(prepared.protectedSecretCount, 1);
@@ -73,17 +75,17 @@ test("written universal ZIP contains only allowlisted package files under the Sk
   const root = await mkdtemp(path.join(tmpdir(), "skill-recorder-universal-"));
   try {
     const summary = await writeUniversalSkillPackage(sampleSkill(), root);
-    assert.equal(path.basename(summary.skillDir), "portable-review");
     assert.equal(path.basename(summary.zipPath), "portable-review.zip");
+    assert.deepEqual(await readdir(root), ["portable-review.zip"]);
 
-    const skillMd = await readFile(path.join(summary.skillDir, "SKILL.md"), "utf8");
-    assert.doesNotMatch(skillMd, new RegExp(secret));
-
-    const entries = new AdmZip(summary.zipPath).getEntries().map((entry) => entry.entryName).sort();
+    const zip = new AdmZip(summary.zipPath);
+    const entries = zip.getEntries().map((entry) => entry.entryName).sort();
     assert.deepEqual(
       entries,
       summary.files.map((file) => `portable-review/${file}`).sort(),
     );
+    const skillMd = zip.readAsText("portable-review/SKILL.md");
+    assert.doesNotMatch(skillMd, new RegExp(secret));
     assert.ok(entries.includes("portable-review/SKILL.md"));
     assert.ok(entries.includes("portable-review/.clawhubignore"));
     assert.ok(entries.every((entry) => !entry.includes("automation.json")));

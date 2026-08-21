@@ -4,6 +4,8 @@ import path from "node:path";
 
 import {
   BuiltSkillSchema,
+  normalizeSkillPlanTerminology,
+  normalizeSkillTerminology,
   renderSkillMarkdown,
   requireTargetPlacement,
   SkillPlanSchema,
@@ -45,7 +47,7 @@ const CREATE_PROMPT =
 
 function outputLanguagePrompt(language?: SkillBuildInput["language"]): string {
   return language === "zh-CN"
-    ? " Write all user-facing plan and SKILL.md prose in Simplified Chinese, including titles, descriptions, summaries, generalization notes, value names, step titles, step descriptions, and the final instructions body. Keep slugs, tool IDs, {{tokens}}, URLs, file paths, commands, code, and product names in their original form."
+    ? " Write all user-facing plan and SKILL.md prose in Simplified Chinese, including titles, descriptions, summaries, generalization notes, value names, step titles, step descriptions, and the final instructions body. Always use the product term `Skill`; never use the Chinese translation `技能`. Keep slugs, tool IDs, {{tokens}}, URLs, file paths, commands, code, and product names in their original form."
     : " Write all user-facing plan and SKILL.md prose in English.";
 }
 
@@ -156,7 +158,8 @@ export class SkillBuilder extends AgentBuilder<LiveBuild> {
     let held = this.live.get(sessionId);
     // Prefer the user's edited plan from the review tiles; fall back to the last
     // proposed plan for older callers that don't pass one.
-    const plan = editedPlan ? SkillPlanSchema.parse(editedPlan) : held?.lastPlan ?? null;
+    const rawPlan = editedPlan ? SkillPlanSchema.parse(editedPlan) : held?.lastPlan ?? null;
+    const plan = rawPlan ? normalizeSkillPlanTerminology(rawPlan) : null;
     if (!plan) throw new Error("There is no plan to build from yet.");
     requireTargetPlacement(plan.architecture, "skill", target.kind);
     // The pool may have evicted the live conversation while the user edited the plan;
@@ -191,9 +194,9 @@ export class SkillBuilder extends AgentBuilder<LiveBuild> {
       // final steps, but never emptied below what the plan declared.
       const finalSubmission: SkillSubmission = {
         name: plan.name,
-        description: plan.description,
+        description: normalizeSkillTerminology(plan.description),
         allowedTools: submission.allowedTools.length ? submission.allowedTools : plan.allowedTools,
-        body: submission.body,
+        body: normalizeSkillTerminology(submission.body),
       };
       const built = toBuiltSkill(sessionId, plan.architecture, finalSubmission, plan);
       const exportPath =

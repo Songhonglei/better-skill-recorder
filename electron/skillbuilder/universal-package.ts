@@ -1,4 +1,4 @@
-import { createWriteStream, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { createWriteStream, existsSync, mkdirSync, rmSync } from "node:fs";
 import path from "node:path";
 
 import { ZipArchive } from "archiver";
@@ -103,6 +103,20 @@ function renderTokens(text: string, replacements: Map<string, string>): string {
       return replacements.get(segment.id) ?? `{{${segment.id}}}`;
     })
     .join("");
+}
+
+function replaceCapturedValues(
+  text: string,
+  values: BuiltSkill["values"],
+  replacements: Map<string, string>,
+): string {
+  let cleaned = text;
+  for (const value of [...values].sort((a, b) => b.value.length - a.value.length)) {
+    const replacement = replacements.get(value.id);
+    if (!value.value || !replacement) continue;
+    cleaned = cleaned.split(value.value).join(replacement);
+  }
+  return cleaned;
 }
 
 function replaceRanges(
@@ -266,23 +280,24 @@ export async function prepareUniversalSkillPackage(
     if (await valueIsSensitive(value.name || value.id, value.value)) {
       const variable = envName(value.id || value.name, state.env);
       state.env.set(variable, `Provide ${value.name || value.id} for this Skill.`);
-      state.config[key] = `<set-via-env:${variable}>`;
       replacements.set(value.id, `{{env.${variable}}}`);
       state.protectedSecretCount++;
-      state.configuredValueCount++;
       continue;
     }
-    state.config[key] = isLocalAbsolutePath(value.value)
-      ? "<configure-path>"
-      : value.value || "<configure-value>";
+    // A value does not need to be a credential to identify the person or system
+    // that created the Skill (project refs, repository names, tenant ids, template
+    // choices, and similar instance data all do). Examples therefore contain only
+    // typed placeholders; the captured value is never copied into a shareable file.
+    state.config[key] = isLocalAbsolutePath(value.value) ? "<configure-path>" : "<configure-value>";
     replacements.set(value.id, `{{config.${key}}}`);
     state.configuredValueCount++;
     if (isLocalAbsolutePath(value.value)) state.portablePathCount++;
   }
 
   let body = renderTokens(skill.body, replacements);
+  body = replaceCapturedValues(body, skill.values, replacements);
   body = await sanitizeResidualText(body, state);
-  let description = skill.description.trim();
+  let description = replaceCapturedValues(skill.description.trim(), skill.values, replacements);
   if ((await sensitiveMatches(description)).length || LOCAL_PATH_RE.test(description)) {
     description = /[\u3400-\u9fff]/.test(skill.description)
       ? "按需执行已配置的通用工作流程。"
@@ -329,12 +344,13 @@ export async function prepareUniversalSkillPackage(
   };
 }
 
-function uniquePackageRoot(baseDir: string, name: string): string {
-  const base = path.join(baseDir, `${name}-universal`);
+function uniqueZipPath(baseDir: string, name: string): string {
+  const base = path.join(baseDir, `${name}.zip`);
   if (!existsSync(base)) return base;
   let n = 2;
-  while (existsSync(`${base}-${n}`)) n++;
-  return `${base}-${n}`;
+  let candidate = path.join(baseDir, `${name}-${n}.zip`);
+  while (existsSync(candidate)) candidate = path.join(baseDir, `${name}-${++n}.zip`);
+  return candidate;
 }
 
 function writeZip(zipPath: string, name: string, files: PackageFiles): Promise<void> {
@@ -359,32 +375,24 @@ function writeZip(zipPath: string, name: string, files: PackageFiles): Promise<v
   });
 }
 
-/** Write the prepared folder plus a metadata-clean ZIP into a fresh wrapper directory. */
+/** Write one metadata-clean ZIP. No expanded copy or captured value is left beside it. */
 export async function writeUniversalSkillPackage(
   skill: BuiltSkill,
   baseDir: string,
 ): Promise<UniversalSkillPackageSummary> {
   const prepared = await prepareUniversalSkillPackage(skill);
-  const packageRoot = uniquePackageRoot(path.resolve(baseDir), prepared.name);
-  const skillDir = path.join(packageRoot, prepared.name);
-  const zipPath = path.join(packageRoot, `${prepared.name}.zip`);
-  mkdirSync(skillDir, { recursive: true });
+  const resolvedBase = path.resolve(baseDir);
+  mkdirSync(resolvedBase, { recursive: true });
+  const zipPath = uniqueZipPath(resolvedBase, prepared.name);
   try {
-    for (const [relative, content] of prepared.files) {
-      const file = path.join(skillDir, relative);
-      mkdirSync(path.dirname(file), { recursive: true });
-      writeFileSync(file, content, { encoding: "utf8", mode: 0o644 });
-    }
     await writeZip(zipPath, prepared.name, prepared.files);
   } catch (err) {
-    rmSync(packageRoot, { recursive: true, force: true });
+    rmSync(zipPath, { force: true });
     throw err;
   }
 
   return {
     name: prepared.name,
-    packageRoot,
-    skillDir,
     zipPath,
     files: [...prepared.files.keys()].sort(),
     configuredValueCount: prepared.configuredValueCount,

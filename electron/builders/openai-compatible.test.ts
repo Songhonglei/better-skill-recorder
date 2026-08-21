@@ -4,9 +4,14 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
+import { normalizeSkillTerminology } from "../../common/skill";
 import { OpenAICompatibleRuntime, type AgentFetch } from "../agent-runtime/openai-compatible-runtime";
 import { AutomationBuilder } from "../automationbuilder/builder";
 import { SkillBuilder } from "../skillbuilder/builder";
+
+test("Chinese Skill terminology is normalized without awkward spacing", () => {
+  assert.equal(normalizeSkillTerminology("此技能将生成可复用技能。"), "此 Skill 将生成可复用 Skill。");
+});
 
 function completion(id: string, name: string, payload: Record<string, unknown>): Response {
   return Response.json({
@@ -134,8 +139,10 @@ test("custom provider plans, refines, and creates a Skill", async (t) => {
   assert.equal(requests.length, 3);
   const initialMessages = requests[0].messages as Array<{ content?: string }>;
   assert.match(initialMessages.at(-1)?.content ?? "", /Simplified Chinese/);
+  assert.match(initialMessages.at(-1)?.content ?? "", /never use the Chinese translation `技能`/);
   const createMessages = requests[2].messages as Array<{ content?: string }>;
   assert.match(createMessages.at(-1)?.content ?? "", /Simplified Chinese/);
+  assert.match(createMessages.at(-1)?.content ?? "", /never use the Chinese translation `技能`/);
   const refineMessages = requests[1].messages as Array<Record<string, unknown>>;
   assert.ok(refineMessages.some((message) => message.role === "tool"));
 });

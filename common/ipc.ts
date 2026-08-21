@@ -227,16 +227,12 @@ export interface SkillCreateResult {
   error?: string;
 }
 
-/** Audit summary for a portable, shareable Skill folder and its clean ZIP. */
+/** Audit summary for one portable, shareable, allowlist-built Skill ZIP. */
 export interface UniversalSkillPackageSummary {
   name: string;
-  /** Wrapper directory containing both the publishable folder and ZIP. */
-  packageRoot: string;
-  /** ClawHub-ready directory whose basename matches the SKILL.md `name`. */
-  skillDir: string;
   /** Clean archive for direct sharing; expands to `<name>/...`. */
   zipPath: string;
-  /** Allowlisted relative files included in both outputs. */
+  /** Allowlisted relative files included in the archive. */
   files: string[];
   configuredValueCount: number;
   protectedSecretCount: number;

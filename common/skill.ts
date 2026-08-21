@@ -69,6 +69,31 @@ export const SkillPlanSchema = z.preprocess(
 );
 export type SkillPlan = z.infer<typeof SkillPlanSchema>;
 
+export function normalizeSkillTerminology(text: string): string {
+  return text
+    .replace(/技能/g, "Skill")
+    .replace(/([\p{Script=Han}])Skill/gu, "$1 Skill")
+    .replace(/Skill([\p{Script=Han}])/gu, "Skill $1");
+}
+
+/** Keep the user-facing product term consistent without changing captured values. */
+export function normalizeSkillPlanTerminology(plan: SkillPlan): SkillPlan {
+  const term = normalizeSkillTerminology;
+  return {
+    ...plan,
+    title: term(plan.title),
+    description: term(plan.description),
+    summary: term(plan.summary),
+    generalization: term(plan.generalization),
+    values: plan.values.map((value) => ({ ...value, name: term(value.name) })),
+    steps: plan.steps.map((step) => ({
+      ...step,
+      title: term(step.title),
+      text: term(step.text),
+    })),
+  };
+}
+
 /**
  * The payload the agent submits via `submit_skill` once the plan is approved.
  * The engine renders this into `SKILL.md` and wraps it into a {@link BuiltSkill}.
