@@ -43,12 +43,13 @@ import { skillPlacementModel, skillTargetFor } from "./skill-placement";
 import { SensitiveReview } from "./SensitiveReview";
 import { ProviderSettings } from "./ProviderSettings";
 import { useLanguage } from "./i18n";
+import brandMark from "./assets/brand-mark.png";
 
 type LibraryView = "sessions" | "model";
 
 const RecorderMark = () => (
   <span className="lib-mark" aria-hidden>
-    <i /><i /><i />
+    <img src={brandMark} alt="" />
   </span>
 );
 

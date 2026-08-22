@@ -55,7 +55,7 @@ export function createRecorderWindow(): BrowserWindow {
     fullscreenable: false,
     title: "Better Skill Recorder",
     icon: windowIcon(),
-    backgroundColor: "#faf8f5",
+    backgroundColor: "#0b1514",
     webPreferences: {
       preload: path.join(dirname, "preload.cjs"),
       contextIsolation: true,

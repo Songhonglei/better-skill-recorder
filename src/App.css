@@ -2582,12 +2582,45 @@ button:focus-visible,
    Better Skill Recorder — instrument-panel shell + Model Control
    ========================================================================= */
 
+/* The compact recorder is the product's control surface, so it shares the
+   library's deep-teal instrument palette instead of reading like a light web
+   form. Route-scoped tokens keep the document and builder workspace bright. */
+body[data-route="recorder"] {
+  color-scheme: dark;
+  --deck: #0b1514;
+  --surface: #142321;
+  --surface-2: #192a27;
+  --line: rgba(185, 235, 226, 0.14);
+  --line-strong: rgba(185, 235, 226, 0.28);
+  --text: #eff8f5;
+  --muted: #9dafaa;
+  --faint: #748a85;
+  --brand: #35aa9c;
+  --brand-hover: #43bdad;
+  --brand-ink: #78e6d6;
+  --brand-rgb: 78, 205, 186;
+  --signal: var(--brand);
+  --signal-dim: rgba(var(--brand-rgb), 0.13);
+  --go: #3d9b69;
+  background: var(--deck);
+}
+
 .hud {
   position: relative;
   overflow: hidden;
   background:
     radial-gradient(circle at 100% 0%, rgba(var(--brand-rgb), 0.11), transparent 34%),
     linear-gradient(155deg, rgba(255, 255, 255, 0.72), transparent 45%);
+}
+
+body[data-route="recorder"] .hud {
+  background:
+    linear-gradient(rgba(116, 230, 214, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(116, 230, 214, 0.018) 1px, transparent 1px),
+    radial-gradient(circle at 100% 0%, rgba(var(--brand-rgb), 0.15), transparent 34%),
+    linear-gradient(155deg, #132321 0%, #0b1514 62%, #091110 100%);
+  background-size: 26px 26px, 26px 26px, auto, auto;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
 }
 
 .hud::before {
@@ -2611,6 +2644,80 @@ body[data-language="zh-CN"] .hud::before {
     0 18px 34px -24px rgba(7, 35, 33, 0.7),
     0 0 0 7px rgba(var(--brand-rgb), 0.055),
     inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+body[data-route="recorder"] .record {
+  background: radial-gradient(circle at 50% 34%, #23423e 0%, #132724 58%, #0d1b1a 100%);
+  border-color: rgba(151, 231, 218, 0.28);
+  box-shadow:
+    0 20px 34px -22px rgba(0, 0, 0, 0.86),
+    0 0 0 7px rgba(var(--brand-rgb), 0.07),
+    inset 0 1px 0 rgba(218, 255, 249, 0.12),
+    inset 0 -10px 24px rgba(0, 0, 0, 0.16);
+}
+
+body[data-route="recorder"] .record:hover {
+  border-color: rgba(151, 231, 218, 0.48);
+  box-shadow:
+    0 22px 38px -22px rgba(0, 0, 0, 0.9),
+    0 0 0 7px rgba(var(--brand-rgb), 0.1),
+    inset 0 1px 0 rgba(218, 255, 249, 0.16);
+}
+
+body[data-route="recorder"] .record-glyph {
+  box-shadow:
+    0 0 0 5px rgba(var(--rec-rgb), 0.14),
+    0 0 20px rgba(var(--rec-rgb), 0.2);
+}
+
+body[data-route="recorder"] .timecode {
+  color: #91a49f;
+  text-shadow: 0 2px 18px rgba(111, 226, 210, 0.08);
+}
+
+body[data-route="recorder"] .timecode.live {
+  color: var(--text);
+}
+
+body[data-route="recorder"] .narrate,
+body[data-route="recorder"] .privacy-note,
+body[data-route="recorder"] .sessions-open {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02));
+  border: 1px solid var(--line);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+}
+
+body[data-route="recorder"] .narrate-toggle:not(:disabled):hover,
+body[data-route="recorder"] .privacy-note:hover,
+body[data-route="recorder"] .sessions-open:hover {
+  background: rgba(255, 255, 255, 0.065);
+  border-color: var(--line-strong);
+}
+
+body[data-route="recorder"] .sessions-open.has-new {
+  background: linear-gradient(135deg, rgba(var(--rec-rgb), 0.11), rgba(var(--rec-rgb), 0.045));
+  border-color: rgba(var(--rec-rgb), 0.42);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    0 10px 26px -22px rgba(var(--rec-rgb), 0.7);
+}
+
+body[data-route="recorder"] .sessions-open.has-new:hover {
+  background: linear-gradient(135deg, rgba(var(--rec-rgb), 0.15), rgba(var(--rec-rgb), 0.065));
+  border-color: rgba(var(--rec-rgb), 0.58);
+}
+
+body[data-route="recorder"] .narrate-settings {
+  background: #142321;
+  box-shadow: 0 24px 50px -18px rgba(0, 0, 0, 0.82), 0 6px 18px -10px rgba(0, 0, 0, 0.72);
+}
+
+body[data-route="recorder"] .narrate-scrim {
+  background: rgba(2, 9, 8, 0.56);
+}
+
+body[data-route="recorder"] .doctor {
+  padding-top: 2px;
 }
 
 .lib {
@@ -2667,28 +2774,20 @@ body[data-language="zh-CN"] .hud::before {
   width: 32px;
   height: 32px;
   flex: none;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 3px;
-  padding: 8px 7px;
-  border-radius: 9px;
-  color: #78f0df;
-  background: rgba(120, 240, 223, 0.1);
-  border: 1px solid rgba(120, 240, 223, 0.18);
-  box-shadow: inset 0 0 16px rgba(120, 240, 223, 0.06);
-}
-
-.lib-mark i {
   display: block;
-  width: 3px;
-  height: 8px;
-  border-radius: 4px;
-  background: currentColor;
+  overflow: hidden;
+  border-radius: 9px;
+  background: #10201f;
+  border: 1px solid rgba(120, 240, 223, 0.18);
+  box-shadow: 0 8px 20px -12px rgba(93, 238, 217, 0.8);
 }
 
-.lib-mark i:nth-child(2) { height: 15px; }
-.lib-mark i:nth-child(3) { height: 11px; opacity: 0.65; }
+.lib-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 
 .lib-nav {
   display: flex;
@@ -4542,6 +4641,9 @@ body[data-route="recorder"] .language-switcher {
   right: 10px;
   min-height: 24px;
   padding: 2px;
+  border-color: rgba(185, 235, 226, 0.16);
+  background: rgba(8, 19, 18, 0.74);
+  box-shadow: 0 8px 24px -14px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.055);
 }
 
 body[data-route="recorder"] .language-switcher button {
@@ -4549,6 +4651,12 @@ body[data-route="recorder"] .language-switcher button {
   height: 20px;
   padding-inline: 6px;
   font-size: 8px;
+}
+
+body[data-route="recorder"] .language-switcher button.active {
+  background: #d9f7f1;
+  color: #0b1716;
+  box-shadow: 0 5px 14px -8px rgba(107, 237, 217, 0.72);
 }
 
 body[data-language="zh-CN"] {
