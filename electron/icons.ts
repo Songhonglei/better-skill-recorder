@@ -8,7 +8,8 @@ import { nativeImage } from "electron";
  * `dist-electron/assets/icons` (see `copyStaticAssets` in vite.config.ts), so
  * they resolve identically in `vite dev` and in a packaged build.
  *
- * The app uses a single static identity: the "recording" tile with the red dot.
+ * The app uses a single static identity: the teal three-stage signal mark with a
+ * small coral capture light. The menu-bar glyph stays deliberately simpler.
  */
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const ICON_DIR = path.join(dirname, "assets", "icons");
@@ -33,7 +34,7 @@ export function trayIcon(): Electron.NativeImage | null {
   return tile ? tile.resize({ width: 32, height: 32 }) : null;
 }
 
-/** Full-resolution red-dot app tile used to drive the macOS Dock icon. */
+/** Full-resolution Better Skill Recorder identity used to drive the macOS Dock icon. */
 export function dockIcon(): Electron.NativeImage | null {
   if (process.platform !== "darwin") return null;
   return load("app-active.png");
