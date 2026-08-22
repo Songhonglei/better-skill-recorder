@@ -69,9 +69,9 @@ function isInside(root: string, dir: string): boolean {
 /**
  * Where {@link SkillBuilder.create} writes the finished SKILL.md:
  * - **install** — into the agent's live skills folder ({@link skillsRoot}), auto-loaded.
- * - **export** — into a user-picked folder (a "download"), as `<dir>/<name>/SKILL.md`.
+ * - **session** — into this recording's private workspace until the user explicitly exports it.
  */
-export type SkillTarget = { kind: "install" } | { kind: "export"; dir: string };
+export type SkillTarget = { kind: "install" } | { kind: "session" };
 
 interface LiveBuild extends BaseLive {
   sessionDir: string;
@@ -146,9 +146,8 @@ export class SkillBuilder extends AgentBuilder<LiveBuild> {
   /** Finalize the user-edited plan into a SKILL.md and place it. The edited plan is
    *  authoritative: its name/description/values/steps are used verbatim and only the
    *  markdown body is written by the agent (which references each fixed value by its
-   *  `{{id}}` token; `renderSkillMarkdown` substitutes the literals). `target` picks the
-   *  destination — installed into the agent's live skills folder, or exported (downloaded)
-   *  to a user-picked dir. */
+   *  `{{id}}` token; `renderSkillMarkdown` substitutes the literals). `target` either
+   *  installs into a live skills folder or stages a private session copy for later export. */
   async create(
     sessionId: string,
     editedPlan?: SkillPlan,
@@ -161,7 +160,9 @@ export class SkillBuilder extends AgentBuilder<LiveBuild> {
     const rawPlan = editedPlan ? SkillPlanSchema.parse(editedPlan) : held?.lastPlan ?? null;
     const plan = rawPlan ? normalizeSkillPlanTerminology(rawPlan) : null;
     if (!plan) throw new Error("There is no plan to build from yet.");
-    requireTargetPlacement(plan.architecture, "skill", target.kind);
+    // A session build corresponds to an export-capable architecture, but does not
+    // write outside the recording until the user chooses an export privacy mode.
+    requireTargetPlacement(plan.architecture, "skill", target.kind === "session" ? "export" : "install");
     // The pool may have evicted the live conversation while the user edited the plan;
     // recreate one so export always works.
     if (!held) held = await this.createLive(sessionId, plan.architecture);
@@ -200,13 +201,13 @@ export class SkillBuilder extends AgentBuilder<LiveBuild> {
       };
       const built = toBuiltSkill(sessionId, plan.architecture, finalSubmission, plan);
       const exportPath =
-        target.kind === "export" ? this.exportSkillTo(built, target.dir) : this.exportSkill(built);
+        target.kind === "session" ? this.stageSkill(built, live.sessionDir) : this.exportSkill(built);
       const finalSkill: BuiltSkill = { ...built, exportedPath: exportPath, exportedAt: Date.now() };
       this.persist(live.sessionDir, finalSkill);
       this.emit(
         sessionId,
         "done",
-        target.kind === "export" ? `Skill exported to ${exportPath}` : `Skill added: ${exportPath}`,
+        target.kind === "session" ? "Skill generated" : `Skill added: ${exportPath}`,
       );
       return { skill: finalSkill, path: exportPath };
     } finally {
@@ -308,16 +309,10 @@ export class SkillBuilder extends AgentBuilder<LiveBuild> {
     return file;
   }
 
-  /** Export (download) the SKILL.md into a user-picked folder as `<baseDir>/<name>/SKILL.md`;
-   *  returns its path. Always picks a fresh, non-colliding subfolder within `baseDir`. */
-  private exportSkillTo(skill: BuiltSkill, baseDir: string): string {
+  /** Keep the generated source private to the recording until explicit export. */
+  private stageSkill(skill: BuiltSkill, baseDir: string): string {
     const name = slugifySkillName(skill.name);
-    let dir = path.join(baseDir, name);
-    if (existsSync(dir)) {
-      let n = 2;
-      while (existsSync(path.join(baseDir, `${name}-${n}`))) n++;
-      dir = path.join(baseDir, `${name}-${n}`);
-    }
+    const dir = path.join(baseDir, "generated-skill", name);
     mkdirSync(dir, { recursive: true });
     const file = path.join(dir, "SKILL.md");
     writeFileSync(file, renderSkillMarkdown(skill));

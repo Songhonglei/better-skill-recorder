@@ -63,12 +63,11 @@ because the recording used it once.
 - Map each recorded action to the target's native capability. Searching Teams becomes
   a WorkIQ call, not simulated clicks; reading a local file becomes the file tools;
   editing a spreadsheet becomes the built-in spreadsheet skill.
-- When a service ships a first-class CLI on the device, prefer it over the browser —
-  above all **GitHub → the \`gh\` CLI**, plus \`git\` and cloud CLIs (Scout runs on the
-  user's Mac or Windows machine). Only fall back to browser automation for genuine
-  UI-only steps (a web app with no API and no CLI). Gate the shell with \`allowed-tools\`
-  (e.g. \`Bash(gh *)\`) and write commands for the device OS (zsh/bash on macOS,
-  PowerShell on Windows).
+- When a service ships a first-class CLI, prefer it over the browser — above all
+  **GitHub → the \`gh\` CLI**, plus \`git\` and cloud CLIs. Only fall back to browser
+  automation for genuine UI-only steps (a web app with no API and no CLI). Follow the
+  target catalogue for tool permissions and OS assumptions. For a generic target,
+  describe required CLIs in the body and avoid host-specific metadata or tool names.
 - Record the chosen tool on each step (the step's \`tool\`), and set \`allowedTools\` to the
   patterns the skill actually needs.
 - Rely ONLY on the built-in tools and skills in the catalogue — never on a skill the

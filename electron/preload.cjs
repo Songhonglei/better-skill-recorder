@@ -43,8 +43,8 @@ const IPC = {
   exportDebugBundle: "sessions:export-debug",
   buildSkill: "skill:build",
   createSkill: "skill:create",
-  exportUniversalSkill: "skill:export-universal",
-  revealUniversalSkill: "skill:reveal-universal",
+  exportSkillPackage: "skill:export-package",
+  revealSkillPackage: "skill:reveal-package",
   getSkill: "skill:get",
   cancelSkill: "skill:cancel",
   revealSkill: "skill:reveal",
@@ -151,9 +151,9 @@ contextBridge.exposeInMainWorld("skillRecorder", {
   exportDebugBundle: (sessionId) => ipcRenderer.invoke(IPC.exportDebugBundle, sessionId),
   buildSkill: (input) => ipcRenderer.invoke(IPC.buildSkill, input),
   createSkill: (sessionId, plan, placement) => ipcRenderer.invoke(IPC.createSkill, sessionId, plan, placement),
-  exportUniversalSkill: (sessionId, language) =>
-    ipcRenderer.invoke(IPC.exportUniversalSkill, sessionId, language),
-  revealUniversalSkill: (sessionId) => ipcRenderer.invoke(IPC.revealUniversalSkill, sessionId),
+  exportSkillPackage: (sessionId, mode, language) =>
+    ipcRenderer.invoke(IPC.exportSkillPackage, sessionId, mode, language),
+  revealSkillPackage: (sessionId) => ipcRenderer.invoke(IPC.revealSkillPackage, sessionId),
   getSkill: (sessionId) => ipcRenderer.invoke(IPC.getSkill, sessionId),
   cancelSkill: (sessionId) => ipcRenderer.invoke(IPC.cancelSkill, sessionId),
   revealSkill: (sessionId) => ipcRenderer.invoke(IPC.revealSkill, sessionId),

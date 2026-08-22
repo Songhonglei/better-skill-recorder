@@ -3,9 +3,9 @@ import path from "node:path";
 
 import { ZipArchive } from "archiver";
 
-import type { UniversalSkillPackageSummary } from "../../common/ipc";
+import type { SkillExportMode, SkillPackageSummary } from "../../common/ipc";
 import { resolveOverlaps, scanStructuredPii, type SensitiveMatch } from "../../common/sensitive";
-import { slugifySkillName, type BuiltSkill } from "../../common/skill";
+import { normalizeSkillTerminology, slugifySkillName, type BuiltSkill } from "../../common/skill";
 import { tokenize } from "../../common/values";
 import { scanSecrets } from "../sensitive/secrets";
 
@@ -24,7 +24,6 @@ const KNOWN_BINS = [
   "node",
   "npm",
   "npx",
-  "openclaw",
   "osascript",
   "pnpm",
   "python3",
@@ -44,8 +43,9 @@ interface PackageState {
   usedConfigKeys: Set<string>;
 }
 
-export interface PreparedUniversalSkillPackage {
+export interface PreparedSkillPackage {
   name: string;
+  mode: SkillExportMode;
   files: PackageFiles;
   configuredValueCount: number;
   protectedSecretCount: number;
@@ -188,36 +188,18 @@ function yamlString(value: string): string {
   return JSON.stringify(value.trim());
 }
 
-function renderFrontmatter(
-  name: string,
-  description: string,
-  env: Map<string, string>,
-  bins: string[],
-): string {
-  const lines = ["---", `name: ${name}`, `description: ${yamlString(description)}`, "version: 1.0.0"];
-  if (env.size || bins.length) {
-    lines.push("metadata:", "  openclaw:", "    requires:");
-    if (env.size) {
-      lines.push("      env:");
-      for (const key of env.keys()) lines.push(`        - ${key}`);
-    }
-    if (bins.length) {
-      lines.push("      bins:");
-      for (const bin of bins) lines.push(`        - ${bin}`);
-    }
-    if (env.size) {
-      lines.push(`    primaryEnv: ${env.keys().next().value as string}`, "    envVars:");
-      for (const [key, detail] of env) {
-        lines.push(
-          `      - name: ${key}`,
-          "        required: true",
-          `        description: ${yamlString(detail)}`,
-        );
-      }
-    }
-  }
-  lines.push("---");
-  return lines.join("\n");
+function renderFrontmatter(name: string, description: string): string {
+  // Keep the common denominator understood by multiple Skill-capable agents.
+  // Host-specific metadata belongs to adapters,
+  // not the exported Skill itself.
+  return ["---", `name: ${name}`, `description: ${yamlString(description)}`, "---"].join("\n");
+}
+
+function requirementsSection(bins: string[], chinese: boolean): string {
+  if (!bins.length) return "";
+  return chinese
+    ? `## 运行要求\n\n需要以下命令行工具：${bins.map((bin) => `\`${bin}\``).join("、")}。`
+    : `## Requirements\n\nRequired command-line tools: ${bins.map((bin) => `\`${bin}\``).join(", ")}.`;
 }
 
 function configurationSection(state: PackageState, chinese: boolean): string {
@@ -257,14 +239,38 @@ function configurationSection(state: PackageState, chinese: boolean): string {
 }
 
 /**
- * Convert a finished on-demand Skill into a portable, allowlist-built package.
- * Raw recordings, analysis artifacts, schedules, installed config, and secrets are
- * never inputs to the returned file map.
+ * Convert a finished on-demand Skill into either a share-safe or personal package.
+ * Raw recordings, analysis artifacts, and schedules are never package inputs.
  */
-export async function prepareUniversalSkillPackage(
+export async function prepareSkillPackage(
   skill: BuiltSkill,
-): Promise<PreparedUniversalSkillPackage> {
+  mode: SkillExportMode,
+): Promise<PreparedSkillPackage> {
   const name = slugifySkillName(skill.name);
+
+  if (mode === "personal") {
+    const replacements = new Map(skill.values.map((value) => [value.id, value.value]));
+    const body = renderTokens(normalizeSkillTerminology(skill.body), replacements).trim();
+    const bins = extractRequiredBins(skill, body);
+    const chinese = /[\u3400-\u9fff]/.test(`${skill.description}\n${body}`);
+    const requirements = requirementsSection(bins, chinese);
+    const markdownBody = [requirements, body].filter(Boolean).join("\n\n");
+    return {
+      name,
+      mode,
+      files: new Map([[
+        "SKILL.md",
+        `${renderFrontmatter(name, normalizeSkillTerminology(skill.description))}\n\n${markdownBody}\n`,
+      ]]),
+      configuredValueCount: skill.values.length,
+      protectedSecretCount: 0,
+      portablePathCount: 0,
+      removedAllowedToolCount: skill.allowedTools.filter((tool) => tool.trim()).length,
+      requiredBins: bins,
+      warnings: [],
+    };
+  }
+
   const state: PackageState = {
     config: {},
     env: new Map(),
@@ -294,10 +300,12 @@ export async function prepareUniversalSkillPackage(
     if (isLocalAbsolutePath(value.value)) state.portablePathCount++;
   }
 
-  let body = renderTokens(skill.body, replacements);
-  body = replaceCapturedValues(body, skill.values, replacements);
+  let body = replaceCapturedValues(skill.body, skill.values, replacements);
+  body = normalizeSkillTerminology(renderTokens(body, replacements));
   body = await sanitizeResidualText(body, state);
-  let description = replaceCapturedValues(skill.description.trim(), skill.values, replacements);
+  let description = normalizeSkillTerminology(
+    replaceCapturedValues(skill.description.trim(), skill.values, replacements),
+  );
   if ((await sensitiveMatches(description)).length || LOCAL_PATH_RE.test(description)) {
     description = /[\u3400-\u9fff]/.test(skill.description)
       ? "按需执行已配置的通用工作流程。"
@@ -310,8 +318,10 @@ export async function prepareUniversalSkillPackage(
   if (setup) body = `${setup}\n\n${body.trim()}`;
 
   const bins = extractRequiredBins(skill, body);
+  const requirements = requirementsSection(bins, chinese);
+  if (requirements) body = `${requirements}\n\n${body.trim()}`;
   const files: PackageFiles = new Map();
-  files.set("SKILL.md", `${renderFrontmatter(name, description, state.env, bins)}\n\n${body.trim()}\n`);
+  files.set("SKILL.md", `${renderFrontmatter(name, description)}\n\n${body.trim()}\n`);
   if (Object.keys(state.config).length) {
     files.set("config.example.json", `${JSON.stringify(state.config, null, 2)}\n`);
   }
@@ -319,10 +329,6 @@ export async function prepareUniversalSkillPackage(
     files.set(".env.example", `${[...state.env.keys()].map((key) => `${key}=`).join("\n")}\n`);
   }
   files.set(".gitignore", ["config.json", ".env", ".DS_Store", "__MACOSX/", "*.log", ""].join("\n"));
-  files.set(
-    ".clawhubignore",
-    ["config.json", ".env", ".DS_Store", "__MACOSX/", "*.log", "*.zip", ""].join("\n"),
-  );
 
   const warnings: string[] = [];
   if (HOST_SPECIFIC_RE.test(body)) {
@@ -334,6 +340,7 @@ export async function prepareUniversalSkillPackage(
 
   return {
     name,
+    mode,
     files,
     configuredValueCount: state.configuredValueCount,
     protectedSecretCount: state.protectedSecretCount,
@@ -344,12 +351,13 @@ export async function prepareUniversalSkillPackage(
   };
 }
 
-function uniqueZipPath(baseDir: string, name: string): string {
-  const base = path.join(baseDir, `${name}.zip`);
+function uniqueZipPath(baseDir: string, name: string, mode: SkillExportMode): string {
+  const suffix = mode === "share" ? "share" : "personal";
+  const base = path.join(baseDir, `${name}-${suffix}.zip`);
   if (!existsSync(base)) return base;
   let n = 2;
-  let candidate = path.join(baseDir, `${name}-${n}.zip`);
-  while (existsSync(candidate)) candidate = path.join(baseDir, `${name}-${++n}.zip`);
+  let candidate = path.join(baseDir, `${name}-${suffix}-${n}.zip`);
+  while (existsSync(candidate)) candidate = path.join(baseDir, `${name}-${suffix}-${++n}.zip`);
   return candidate;
 }
 
@@ -375,15 +383,16 @@ function writeZip(zipPath: string, name: string, files: PackageFiles): Promise<v
   });
 }
 
-/** Write one metadata-clean ZIP. No expanded copy or captured value is left beside it. */
-export async function writeUniversalSkillPackage(
+/** Write one host-neutral ZIP without leaving an expanded copy beside it. */
+export async function writeSkillPackage(
   skill: BuiltSkill,
   baseDir: string,
-): Promise<UniversalSkillPackageSummary> {
-  const prepared = await prepareUniversalSkillPackage(skill);
+  mode: SkillExportMode,
+): Promise<SkillPackageSummary> {
+  const prepared = await prepareSkillPackage(skill, mode);
   const resolvedBase = path.resolve(baseDir);
   mkdirSync(resolvedBase, { recursive: true });
-  const zipPath = uniqueZipPath(resolvedBase, prepared.name);
+  const zipPath = uniqueZipPath(resolvedBase, prepared.name, mode);
   try {
     await writeZip(zipPath, prepared.name, prepared.files);
   } catch (err) {
@@ -393,6 +402,7 @@ export async function writeUniversalSkillPackage(
 
   return {
     name: prepared.name,
+    mode,
     zipPath,
     files: [...prepared.files.keys()].sort(),
     configuredValueCount: prepared.configuredValueCount,

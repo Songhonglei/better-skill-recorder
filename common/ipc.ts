@@ -208,9 +208,9 @@ export interface SkillPlanResult {
 }
 
 /**
- * Where a built skill lands:
+ * How a built Skill is finalized:
  * - **install** — write it into the target agent's live skills folder (Scout auto-loads it).
- * - **export** — download it to a folder the user picks (the only option for Cowork).
+ * - **export** — keep a private generated copy in the recording until explicit ZIP export.
  */
 export type SkillPlacement = TargetPlacement;
 
@@ -227,12 +227,16 @@ export interface SkillCreateResult {
   error?: string;
 }
 
-/** Audit summary for one portable, shareable, allowlist-built Skill ZIP. */
-export interface UniversalSkillPackageSummary {
+/** Whether an exported Skill ZIP is safe to share or keeps the user's local values. */
+export type SkillExportMode = "share" | "personal";
+
+/** Audit summary for one exported Skill ZIP. */
+export interface SkillPackageSummary {
   name: string;
-  /** Clean archive for direct sharing; expands to `<name>/...`. */
+  mode: SkillExportMode;
+  /** Archive that expands to `<name>/...`. */
   zipPath: string;
-  /** Allowlisted relative files included in the archive. */
+  /** Relative files included in the archive. */
   files: string[];
   configuredValueCount: number;
   protectedSecretCount: number;
@@ -243,9 +247,9 @@ export interface UniversalSkillPackageSummary {
   warnings: string[];
 }
 
-export interface UniversalSkillPackageResult {
+export interface SkillPackageResult {
   ok: boolean;
-  package?: UniversalSkillPackageSummary;
+  package?: SkillPackageSummary;
   /** True when the destination picker was dismissed. */
   canceled?: boolean;
   error?: string;
@@ -502,8 +506,8 @@ export const IPC = {
   exportDebugBundle: "sessions:export-debug",
   buildSkill: "skill:build",
   createSkill: "skill:create",
-  exportUniversalSkill: "skill:export-universal",
-  revealUniversalSkill: "skill:reveal-universal",
+  exportSkillPackage: "skill:export-package",
+  revealSkillPackage: "skill:reveal-package",
   getSkill: "skill:get",
   cancelSkill: "skill:cancel",
   revealSkill: "skill:reveal",
@@ -609,18 +613,19 @@ export interface SkillRecorderApi {
   /**
    * Finalize the (user-edited) skill plan and place its SKILL.md. The edited plan the
    * user sees is authoritative — the body is written from exactly these values and steps.
-   * `placement` picks the destination: `"install"` writes into the target agent's live
-   * skills folder (Scout); `"export"` prompts for a folder and downloads it there (the
-   * only option for Cowork). Defaults to `"install"`.
+   * `placement` picks the finalization: `"install"` writes into the target agent's live
+   * skills folder; `"export"` keeps a private generated copy until the user chooses the
+   * share-safe or personal ZIP mode. Defaults to `"install"`.
    */
   createSkill(sessionId: string, plan: SkillPlan, placement?: SkillPlacement): Promise<SkillCreateResult>;
-  /** Build a sanitized, portable Skill directory plus clean ZIP from a finished Skill. */
-  exportUniversalSkill(
+  /** Export a finished Skill as either a share-safe or personal ZIP. */
+  exportSkillPackage(
     sessionId: string,
+    mode: SkillExportMode,
     language?: UiOutputLanguage,
-  ): Promise<UniversalSkillPackageResult>;
-  /** Reveal the latest universal package exported for this recording. */
-  revealUniversalSkill(sessionId: string): Promise<{ ok: boolean }>;
+  ): Promise<SkillPackageResult>;
+  /** Reveal the latest Skill package exported for this recording. */
+  revealSkillPackage(sessionId: string): Promise<{ ok: boolean }>;
   /** Load a previously built skill for a session, if any. */
   getSkill(sessionId: string): Promise<BuiltSkill | null>;
   /** Abort an in-flight build. */

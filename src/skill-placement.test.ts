@@ -10,7 +10,7 @@ test("placement model preserves Scout and Cowork action ordering", () => {
   assert.deepEqual(
     defaultSkill.actions.map(({ placement, primary, label }) => [placement, primary, label]),
     [
-      ["export", false, "Export…"],
+      ["export", false, "Generate"],
       ["install", true, "Add to Scout"],
     ],
   );
@@ -31,6 +31,6 @@ test("placement model preserves Scout and Cowork action ordering", () => {
   assert.equal(exportOnly.defaultPlacement, "export");
   assert.deepEqual(
     exportOnly.actions.map(({ placement, primary, label }) => [placement, primary, label]),
-    [["export", true, "Export skill"]],
+    [["export", true, "Generate Skill"]],
   );
 });

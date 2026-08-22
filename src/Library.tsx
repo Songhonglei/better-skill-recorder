@@ -10,8 +10,9 @@ import type {
   SensitiveReport,
   SessionSummary,
   SkillBuildProgress,
+  SkillExportMode,
+  SkillPackageSummary,
   SkillPlacement,
-  UniversalSkillPackageSummary,
 } from "../common/ipc";
 import { isCopilotSignedOutError } from "../common/ipc";
 import type {
@@ -1064,6 +1065,117 @@ function TargetPicker({
 
 type BuildPhase = "loading" | "ready" | "planning" | "plan" | "creating" | "done";
 
+function SkillExportSheet({
+  mode,
+  busy,
+  onModeChange,
+  onCancel,
+  onExport,
+}: {
+  mode: SkillExportMode;
+  busy: boolean;
+  onModeChange: (mode: SkillExportMode) => void;
+  onCancel: () => void;
+  onExport: () => void;
+}) {
+  const { language } = useLanguage();
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    dialogRef.current?.focus({ preventScroll: true });
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !busy) onCancel();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [busy, onCancel]);
+
+  const choices: Array<{
+    mode: SkillExportMode;
+    title: string;
+    note: string;
+    badge?: string;
+  }> = language === "zh-CN"
+    ? [
+        {
+          mode: "share",
+          title: "给其他人用",
+          note: "不包含敏感信息和本地配置",
+          badge: "推荐",
+        },
+        {
+          mode: "personal",
+          title: "只给自己用",
+          note: "包含敏感信息和本地配置，请勿分享",
+        },
+      ]
+    : [
+        {
+          mode: "share",
+          title: "For other people",
+          note: "Excludes sensitive information and local configuration",
+          badge: "Recommended",
+        },
+        {
+          mode: "personal",
+          title: "Only for me",
+          note: "Includes sensitive information and local configuration — do not share",
+        },
+      ];
+
+  return (
+    <div className="sheet-backdrop" onClick={busy ? undefined : onCancel}>
+      <div
+        ref={dialogRef}
+        className="sheet skill-export-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="skill-export-title"
+        tabIndex={-1}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className="sheet-head">
+          <span className="sheet-icon" aria-hidden>⇧</span>
+          <h2 id="skill-export-title">{language === "zh-CN" ? "导出 Skill" : "Export Skill"}</h2>
+        </header>
+        <p className="sheet-lead">
+          {language === "zh-CN" ? "选择这个 Skill 包的使用方式。" : "Choose how this Skill package will be used."}
+        </p>
+        <div className="skill-export-options" role="radiogroup">
+          {choices.map((choice) => (
+            <button
+              key={choice.mode}
+              type="button"
+              className={`skill-export-option${mode === choice.mode ? " is-selected" : ""}${choice.mode === "personal" ? " is-private" : ""}`}
+              role="radio"
+              aria-checked={mode === choice.mode}
+              disabled={busy}
+              onClick={() => onModeChange(choice.mode)}
+            >
+              <span className="skill-export-radio" aria-hidden />
+              <span className="skill-export-copy">
+                <strong>{choice.title}</strong>
+                <span>{choice.note}</span>
+              </span>
+              {choice.badge && <span className="skill-export-badge">{choice.badge}</span>}
+            </button>
+          ))}
+        </div>
+        <div className="sheet-actions">
+          <button className="ghost" disabled={busy} onClick={onCancel}>
+            {language === "zh-CN" ? "取消" : "Cancel"}
+          </button>
+          <button className="record-cta" disabled={busy} onClick={onExport}>
+            {busy
+              ? language === "zh-CN" ? "正在导出…" : "Exporting…"
+              : language === "zh-CN" ? "导出" : "Export"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SkillBuilderView({
   sessionId,
   architecture: initialArch,
@@ -1092,8 +1204,10 @@ function SkillBuilderView({
   const [error, setError] = useState<string | null>(null);
   const [exportedPath, setExportedPath] = useState("");
   const [builtName, setBuiltName] = useState("");
-  const [universalPackage, setUniversalPackage] = useState<UniversalSkillPackageSummary | null>(null);
-  const [packagingUniversal, setPackagingUniversal] = useState(false);
+  const [skillPackage, setSkillPackage] = useState<SkillPackageSummary | null>(null);
+  const [exportMode, setExportMode] = useState<SkillExportMode>("share");
+  const [showExportSheet, setShowExportSheet] = useState(false);
+  const [exportingPackage, setExportingPackage] = useState(false);
   const canceled = useRef(false);
   const inFlight = useRef(false);
   const [placement, setPlacement] = useState<SkillPlacement>(() => defaultPlacementFor(initialArch));
@@ -1164,7 +1278,7 @@ function SkillBuilderView({
       canceled.current = false;
       inFlight.current = true;
       setError(null);
-      setStatusLine(which === "export" ? "Exporting the skill…" : "Writing the skill…");
+      setStatusLine(which === "export" ? "Generating the Skill…" : "Writing the Skill…");
       setPhase("creating");
       const res = await window.skillRecorder.createSkill(sessionId, plan, which);
       inFlight.current = false;
@@ -1172,10 +1286,10 @@ function SkillBuilderView({
         setBuiltName(res.skill.name);
         setExportedPath(res.path ?? res.skill.exportedPath ?? "");
         setPlacement(res.placement ?? which);
-        setUniversalPackage(null);
+        setSkillPackage(null);
         setPhase("done");
       } else if (res.canceled) {
-        // User dismissed the export folder picker — quietly return to the plan.
+        // Preserve compatibility with a canceled placement from older main-process builds.
         setPhase("plan");
       } else if (!canceled.current) {
         setError(res.error ?? "Could not create the skill");
@@ -1185,17 +1299,18 @@ function SkillBuilderView({
     [sessionId, plan],
   );
 
-  const exportUniversalPackage = useCallback(async () => {
-    setPackagingUniversal(true);
+  const exportPackage = useCallback(async () => {
+    setExportingPackage(true);
     setError(null);
-    const res = await window.skillRecorder.exportUniversalSkill(sessionId, language);
-    setPackagingUniversal(false);
+    const res = await window.skillRecorder.exportSkillPackage(sessionId, exportMode, language);
+    setExportingPackage(false);
     if (res.ok && res.package) {
-      setUniversalPackage(res.package);
+      setSkillPackage(res.package);
+      setShowExportSheet(false);
       return;
     }
-    if (!res.canceled) setError(res.error ?? "Could not export the universal Skill package");
-  }, [sessionId, language]);
+    if (!res.canceled) setError(res.error ?? "Could not export the Skill package");
+  }, [sessionId, exportMode, language]);
 
   const cancelRun = useCallback(async () => {
     canceled.current = true;
@@ -1299,7 +1414,7 @@ function SkillBuilderView({
             <h2 className="sb-title">
               {placement === "install"
                 ? language === "zh-CN" ? "Skill 已添加" : "Skill added"
-                : language === "zh-CN" ? "Skill 已导出" : "Skill exported"}
+                : language === "zh-CN" ? "Skill 已生成" : "Skill generated"}
             </h2>
             <p>
               <code className="sb-slug">{builtName}</code>{" "}
@@ -1308,17 +1423,25 @@ function SkillBuilderView({
                   ? "已添加到目标 Skill 目录，会自动加载。"
                   : "is in the target Skill directory and loads automatically."
                 : language === "zh-CN"
-                  ? "已生成可安装的 Skill 文件，可用于任何支持 Skill 的智能体。"
-                  : "is ready to install in any agent that supports Skills."}
+                  ? "已生成，可以选择分享版或个人版导出。"
+                  : "is ready to export as a share-safe or personal package."}
             </p>
-            {universalPackage && (
-              <div className="universal-ready" role="status">
+            {skillPackage && (
+              <div className="skill-package-ready" role="status">
                 <span aria-hidden>✓</span>
                 <p>
-                  <strong>{language === "zh-CN" ? "通用 Skill 包已就绪" : "Universal Skill package ready"}</strong>
+                  <strong>
+                    {language === "zh-CN"
+                      ? skillPackage.mode === "share" ? "分享版 Skill 已导出" : "个人版 Skill 已导出"
+                      : skillPackage.mode === "share" ? "Share-safe Skill exported" : "Personal Skill exported"}
+                  </strong>
                   {language === "zh-CN"
-                    ? "已完成配置清理，可直接分享或上传至 ClawHub。"
-                    : "Configuration was cleaned and the ZIP is ready to share or upload to ClawHub."}
+                    ? skillPackage.mode === "share"
+                      ? "敏感信息和本地配置已移除，可以交给其他人使用。"
+                      : "保留了敏感信息和本地配置，请仅限自己使用。"
+                    : skillPackage.mode === "share"
+                      ? "Sensitive information and local configuration were removed."
+                      : "Sensitive information and local configuration are included. Keep it private."}
                 </p>
               </div>
             )}
@@ -1356,13 +1479,13 @@ function SkillBuilderView({
                   title={language === "zh-CN"
                     ? action.placement === "install"
                       ? `添加到 ${skillTargetFor(architecture).installTargetLabel} 并自动加载`
-                      : "将 Skill 下载到你选择的文件夹"
+                      : "生成 Skill，完成后再选择导出方式"
                     : action.title}
                 >
                   {language === "zh-CN"
                     ? action.placement === "install"
                       ? `添加到 ${skillTargetFor(architecture).installTargetLabel}`
-                      : action.primary ? "导出 Skill" : "导出…"
+                      : action.primary ? "生成 Skill" : "生成"
                     : action.label}
                 </button>
               ))}
@@ -1375,24 +1498,30 @@ function SkillBuilderView({
                 {language === "zh-CN" ? "查看 Skill" : "View Skill"}
               </button>
             )}
-            {universalPackage ? (
-              <button className="record-cta" onClick={() => void window.skillRecorder.revealUniversalSkill(sessionId)}>
-                {language === "zh-CN" ? "查看通用 Skill 包" : "View universal Skill package"}
+            {skillPackage ? (
+              <button className="record-cta" onClick={() => void window.skillRecorder.revealSkillPackage(sessionId)}>
+                {language === "zh-CN" ? "查看 Skill 包" : "View Skill package"}
               </button>
             ) : (
               <button
                 className="record-cta"
-                disabled={packagingUniversal}
-                onClick={() => void exportUniversalPackage()}
+                onClick={() => setShowExportSheet(true)}
               >
-                {packagingUniversal
-                  ? language === "zh-CN" ? "正在检查并打包…" : "Checking and packaging…"
-                  : language === "zh-CN" ? "导出通用 Skill 包" : "Export universal Skill package"}
+                {language === "zh-CN" ? "导出 Skill" : "Export Skill"}
               </button>
             )}
           </>
         )}
       </BuildFlowFooter>
+      {showExportSheet && (
+        <SkillExportSheet
+          mode={exportMode}
+          busy={exportingPackage}
+          onModeChange={setExportMode}
+          onCancel={() => setShowExportSheet(false)}
+          onExport={() => void exportPackage()}
+        />
+      )}
     </section>
   );
 }

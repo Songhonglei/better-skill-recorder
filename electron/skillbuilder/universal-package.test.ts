@@ -8,8 +8,8 @@ import AdmZip from "adm-zip";
 
 import { BuiltSkillSchema } from "../../common/skill";
 import {
-  prepareUniversalSkillPackage,
-  writeUniversalSkillPackage,
+  prepareSkillPackage,
+  writeSkillPackage,
 } from "./universal-package";
 
 const secret = "sk-test-1234567890abcdefghijklmnop";
@@ -23,7 +23,7 @@ function sampleSkill() {
     description: "Review a repository with configured values.",
     allowedTools: ["Bash(gh *)", "Read"],
     body: [
-      "Use {{repo}} and authenticate with {{api_key}}.",
+      "Use {{repo}} and authenticate with {{api_key}}. 这是一个可复用技能。",
       "The captured repository was owner/project and must not remain in a shared package.",
       "Read the local template at {{template_path}}.",
       "Run `gh pr list -R {{repo}}` and summarize the result.",
@@ -46,18 +46,21 @@ function sampleSkill() {
   });
 }
 
-test("universal package configures fixed values and keeps secrets out of every file", async () => {
-  const prepared = await prepareUniversalSkillPackage(sampleSkill());
+test("share package configures fixed values and keeps secrets out of every file", async () => {
+  const prepared = await prepareSkillPackage(sampleSkill(), "share");
   const markdown = prepared.files.get("SKILL.md") ?? "";
   const config = prepared.files.get("config.example.json") ?? "";
   const env = prepared.files.get(".env.example") ?? "";
   const all = [...prepared.files.values()].join("\n");
 
   assert.match(markdown, /^---\nname: portable-review\n/m);
-  assert.match(markdown, /version: 1\.0\.0/);
+  assert.doesNotMatch(markdown, /version:/);
+  assert.doesNotMatch(markdown, /metadata:|openclaw|clawhub/i);
   assert.match(markdown, /\{\{config\.repo\}\}/);
   assert.match(markdown, /\{\{env\.API_KEY\}\}/);
   assert.doesNotMatch(markdown, /allowed-tools/);
+  assert.doesNotMatch(markdown, /技能/);
+  assert.match(markdown, /Skill/);
   assert.doesNotMatch(all, new RegExp(secret));
   assert.doesNotMatch(all, /\/Users\/alice/);
   assert.match(config, /"repo": "<configure-value>"/);
@@ -71,12 +74,12 @@ test("universal package configures fixed values and keeps secrets out of every f
   assert.equal(prepared.removedAllowedToolCount, 2);
 });
 
-test("written universal ZIP contains only allowlisted package files under the Skill folder", async () => {
+test("written share ZIP contains only allowlisted package files under the Skill folder", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "skill-recorder-universal-"));
   try {
-    const summary = await writeUniversalSkillPackage(sampleSkill(), root);
-    assert.equal(path.basename(summary.zipPath), "portable-review.zip");
-    assert.deepEqual(await readdir(root), ["portable-review.zip"]);
+    const summary = await writeSkillPackage(sampleSkill(), root, "share");
+    assert.equal(path.basename(summary.zipPath), "portable-review-share.zip");
+    assert.deepEqual(await readdir(root), ["portable-review-share.zip"]);
 
     const zip = new AdmZip(summary.zipPath);
     const entries = zip.getEntries().map((entry) => entry.entryName).sort();
@@ -87,9 +90,35 @@ test("written universal ZIP contains only allowlisted package files under the Sk
     const skillMd = zip.readAsText("portable-review/SKILL.md");
     assert.doesNotMatch(skillMd, new RegExp(secret));
     assert.ok(entries.includes("portable-review/SKILL.md"));
-    assert.ok(entries.includes("portable-review/.clawhubignore"));
+    assert.ok(!entries.includes("portable-review/.clawhubignore"));
     assert.ok(entries.every((entry) => !entry.includes("automation.json")));
     assert.ok(entries.every((entry) => !entry.includes(".DS_Store") && !entry.includes("__MACOSX")));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("personal package keeps captured values but stays host-neutral", async () => {
+  const prepared = await prepareSkillPackage(sampleSkill(), "personal");
+  const markdown = prepared.files.get("SKILL.md") ?? "";
+
+  assert.equal(prepared.mode, "personal");
+  assert.deepEqual([...prepared.files.keys()], ["SKILL.md"]);
+  assert.match(markdown, new RegExp(secret));
+  assert.match(markdown, /owner\/project/);
+  assert.match(markdown, /\/Users\/alice\/private\/template\.md/);
+  assert.doesNotMatch(markdown, /allowed-tools|metadata:|openclaw|clawhub/i);
+  assert.match(markdown, /## (?:Requirements|运行要求)/);
+});
+
+test("personal export writes only one ZIP with the Skill directory", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "skill-recorder-personal-"));
+  try {
+    const summary = await writeSkillPackage(sampleSkill(), root, "personal");
+    assert.equal(path.basename(summary.zipPath), "portable-review-personal.zip");
+    assert.deepEqual(await readdir(root), ["portable-review-personal.zip"]);
+    const zip = new AdmZip(summary.zipPath);
+    assert.deepEqual(zip.getEntries().map((entry) => entry.entryName), ["portable-review/SKILL.md"]);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

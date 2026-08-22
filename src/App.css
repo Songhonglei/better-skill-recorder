@@ -3949,7 +3949,7 @@ body[data-language="zh-CN"] .hud::before {
 
 /* The final page confirms the useful outcome without exposing implementation
    details that belong in logs and automated checks. */
-.universal-ready {
+.skill-package-ready {
   width: 100%;
   box-sizing: border-box;
   margin-top: 10px;
@@ -3963,7 +3963,7 @@ body[data-language="zh-CN"] .hud::before {
   border-radius: 11px;
 }
 
-.universal-ready > span {
+.skill-package-ready > span {
   flex: none;
   width: 26px;
   height: 26px;
@@ -3975,7 +3975,7 @@ body[data-language="zh-CN"] .hud::before {
   font: 700 13px/1 var(--mono);
 }
 
-.universal-ready p {
+.skill-package-ready p {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -3984,10 +3984,96 @@ body[data-language="zh-CN"] .hud::before {
   line-height: 1.4;
 }
 
-.universal-ready strong {
+.skill-package-ready strong {
   display: block;
   color: var(--text);
   font-size: 13px;
+}
+
+.skill-export-sheet {
+  max-width: 460px;
+  gap: 13px;
+}
+
+.skill-export-options {
+  display: grid;
+  gap: 9px;
+}
+
+.skill-export-option {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 13px 14px;
+  text-align: left;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  transition: border-color 0.14s ease, background 0.14s ease, box-shadow 0.14s ease;
+}
+
+.skill-export-option:not(:disabled):hover {
+  border-color: var(--signal);
+  background: var(--signal-dim);
+}
+
+.skill-export-option.is-selected {
+  border-color: var(--signal);
+  background: var(--signal-dim);
+  box-shadow: 0 0 0 1px var(--signal);
+}
+
+.skill-export-option.is-private.is-selected {
+  border-color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 8%, var(--surface));
+  box-shadow: 0 0 0 1px var(--warn);
+}
+
+.skill-export-radio {
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1.5px solid var(--faint);
+  border-radius: 50%;
+  background: var(--surface);
+}
+
+.skill-export-option.is-selected .skill-export-radio {
+  border: 5px solid var(--signal);
+}
+
+.skill-export-option.is-private.is-selected .skill-export-radio {
+  border-color: var(--warn);
+}
+
+.skill-export-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.skill-export-copy strong {
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.skill-export-copy > span {
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.skill-export-badge {
+  padding: 3px 7px;
+  color: var(--brand-ink);
+  background: var(--signal-dim);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
 }
 
 /* Automation-specific: trigger, prompt-steps, and the import hint */

@@ -36,12 +36,12 @@ export function skillPlacementModel(target: BuildTarget): SkillPlacementModel {
       placement === "install"
         ? `Add to ${target.installTargetLabel}`
         : primary
-          ? "Export skill"
-          : "Export…";
+          ? "Generate Skill"
+          : "Generate";
     const title =
       placement === "install"
         ? `Add the skill to ${target.installTargetLabel} so it loads automatically`
-        : "Download the skill to a folder you choose";
+        : "Generate the Skill before choosing an export privacy mode";
     return { placement, primary, label, title };
   });
 

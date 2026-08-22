@@ -76,7 +76,6 @@ function writeAnalysis(root: string, sessionId: string): void {
 
 test("custom provider plans, refines, and creates a Skill", async (t) => {
   const root = mkdtempSync(path.join(os.tmpdir(), "skill-recorder-openai-skill-"));
-  const exportRoot = path.join(root, "exports");
   const previousSessions = process.env.SKILL_RECORDER_SESSIONS_DIR;
   process.env.SKILL_RECORDER_SESSIONS_DIR = root;
   t.after(() => {
@@ -133,7 +132,7 @@ test("custom provider plans, refines, and creates a Skill", async (t) => {
     feedback: "Make the title explicit.",
   });
   assert.equal(refined.title, "Review configured example");
-  const created = await builder.create(sessionId, refined, { kind: "export", dir: exportRoot });
+  const created = await builder.create(sessionId, refined, { kind: "session" });
   assert.ok(existsSync(created.path));
   assert.match(readFileSync(created.path, "utf8"), /https:\/\/example\.com/);
   assert.equal(requests.length, 3);

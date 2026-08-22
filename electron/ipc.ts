@@ -23,11 +23,12 @@ import type {
   ScreenSettingsResult,
   SkillBuildInput,
   SkillCreateResult,
+  SkillExportMode,
+  SkillPackageResult,
+  SkillPackageSummary,
   SkillPlacement,
   SkillPlanResult,
   UiOutputLanguage,
-  UniversalSkillPackageResult,
-  UniversalSkillPackageSummary,
 } from "../common/ipc";
 import { IPC } from "../common/ipc";
 import type { AutomationPlan } from "../common/automation";
@@ -55,7 +56,7 @@ import type { SensitiveModelManager } from "./sensitive/model-manager";
 import { buildRedactor, loadSensitiveReport, saveSensitiveReport, scanSession } from "./sensitive/scanner";
 import { deleteSession, listSessions } from "./sessions";
 import { loadPersistedSkill, SkillBuilder, type SkillTarget } from "./skillbuilder/builder";
-import { writeUniversalSkillPackage } from "./skillbuilder/universal-package";
+import { writeSkillPackage } from "./skillbuilder/universal-package";
 
 const log = createLogger("IPC");
 
@@ -407,29 +408,17 @@ export function registerIpc(
   ipcMain.handle(
     IPC.createSkill,
     async (
-      event,
+      _event,
       sessionId: string,
       plan?: SkillPlan,
       placement: SkillPlacement = "install",
     ): Promise<SkillCreateResult> => {
       if (!isValidSessionId(sessionId)) return { ok: false, error: "Unknown session." };
       try {
-        let target: SkillTarget = { kind: "install" };
-        if (placement === "export") {
-          // Export == download: let the user pick a destination folder; we drop a
-          // ready-to-use <name>/SKILL.md inside it. A dismissed dialog is a cancel, not an error.
-          const win = BrowserWindow.fromWebContents(event.sender) ?? undefined;
-          const opts: OpenDialogOptions = {
-            title: "Export skill to folder",
-            defaultPath: path.join(os.homedir(), "Downloads"),
-            properties: ["openDirectory", "createDirectory"],
-          };
-          const result = win
-            ? await dialog.showOpenDialog(win, opts)
-            : await dialog.showOpenDialog(opts);
-          if (result.canceled || result.filePaths.length === 0) return { ok: false, canceled: true };
-          target = { kind: "export", dir: result.filePaths[0] };
-        }
+        // Generating and exporting are intentionally separate. Export-capable
+        // architectures first write a private session copy; the final screen then
+        // asks whether the ZIP is for sharing or personal use.
+        const target: SkillTarget = placement === "export" ? { kind: "session" } : { kind: "install" };
         const { skill, path: file } = await builder.create(sessionId, plan, target);
         return { ok: true, skill, path: file, placement };
       } catch (err) {
@@ -441,27 +430,31 @@ export function registerIpc(
   );
 
   ipcMain.handle(
-    IPC.exportUniversalSkill,
+    IPC.exportSkillPackage,
     async (
       event,
       sessionId: string,
+      mode: SkillExportMode,
       language?: UiOutputLanguage,
-    ): Promise<UniversalSkillPackageResult> => {
+    ): Promise<SkillPackageResult> => {
       if (!isValidSessionId(sessionId)) return { ok: false, error: "Unknown session." };
+      if (mode !== "share" && mode !== "personal") {
+        return { ok: false, error: "Unknown Skill export mode." };
+      }
       const skill = loadPersistedSkill(sessionId);
       if (!skill) {
         return {
           ok: false,
           error:
             language === "zh-CN"
-              ? "请先生成按需调用的 Skill，再导出通用包。"
-              : "Create the on-demand Skill before exporting a universal package.",
+              ? "请先生成按需调用的 Skill，再导出。"
+              : "Create the on-demand Skill before exporting it.",
         };
       }
       try {
         const win = BrowserWindow.fromWebContents(event.sender) ?? undefined;
         const opts: OpenDialogOptions = {
-          title: language === "zh-CN" ? "导出通用 Skill 包" : "Export universal Skill package",
+          title: language === "zh-CN" ? "导出 Skill" : "Export Skill",
           defaultPath: path.join(os.homedir(), "Downloads"),
           properties: ["openDirectory", "createDirectory"],
         };
@@ -469,26 +462,26 @@ export function registerIpc(
           ? await dialog.showOpenDialog(win, opts)
           : await dialog.showOpenDialog(opts);
         if (selected.canceled || selected.filePaths.length === 0) return { ok: false, canceled: true };
-        const summary = await writeUniversalSkillPackage(skill, selected.filePaths[0]);
+        const summary = await writeSkillPackage(skill, selected.filePaths[0], mode);
         writeFileSync(
-          path.join(sessionDir(sessionId), "universal-package.json"),
+          path.join(sessionDir(sessionId), "skill-package.json"),
           JSON.stringify(summary, null, 2),
         );
         return { ok: true, package: summary };
       } catch (err) {
         const error = err instanceof Error ? err.message : String(err);
-        log.warn("universal skill export failed:", error);
+        log.warn("skill package export failed:", error);
         return { ok: false, error };
       }
     },
   );
 
-  ipcMain.handle(IPC.revealUniversalSkill, (_event, sessionId: string) => {
+  ipcMain.handle(IPC.revealSkillPackage, (_event, sessionId: string) => {
     if (!isValidSessionId(sessionId)) return { ok: false };
     try {
-      const file = path.join(sessionDir(sessionId), "universal-package.json");
+      const file = path.join(sessionDir(sessionId), "skill-package.json");
       if (!existsSync(file)) return { ok: false };
-      const summary = JSON.parse(readFileSync(file, "utf8")) as UniversalSkillPackageSummary;
+      const summary = JSON.parse(readFileSync(file, "utf8")) as SkillPackageSummary;
       if (!summary.zipPath || !existsSync(summary.zipPath)) return { ok: false };
       shell.showItemInFolder(summary.zipPath);
       return { ok: true };

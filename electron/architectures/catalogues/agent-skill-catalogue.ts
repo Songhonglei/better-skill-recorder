@@ -7,20 +7,20 @@ import { defineCatalogueProvider } from "../catalogue-provider";
  * portable capabilities (files, shell/CLIs, documented HTTP APIs) so it can load
  * into whatever agent the user chooses.
  */
-export const AGENT_SKILL_CATALOGUE_VERSION = "2026-08-06";
+export const AGENT_SKILL_CATALOGUE_VERSION = "2026-08-21";
 
 const AGENT_SKILL_CATALOGUE = `
 # Target: Any AI agent with skill support — generic skill catalogue (portable capabilities only)
 
-An **Agent skill** is a portable \`SKILL.md\` file: optional YAML frontmatter followed by a
-markdown **instructions body** (the standard Copilot skill shape). It targets no specific
-host, so it must NOT assume any proprietary built-in tools.
+An **Agent skill** is a portable \`SKILL.md\` file: minimal YAML frontmatter followed by a
+markdown **instructions body**. It targets no specific host and should work across Skill-capable
+agents such as Codex, Claude Code, and OpenClaw without assuming proprietary built-in tools.
 
 Frontmatter fields:
 - \`name\` — kebab-case, \`^[a-z0-9-]+$\`.
 - \`description\` — one line of trigger keywords (when the agent should reach for this skill).
-- \`allowed-tools\` (optional) — a YAML list of tool patterns the skill may use, e.g.
-  \`Bash(gh *)\`, \`Read\`, \`Write\`, \`Grep\`, \`Glob\`. Omit it to allow the default set.
+- Keep exported frontmatter to \`name\` and \`description\`. Describe required CLIs in the body
+  instead of adding host-specific metadata or permission fields.
 
 The body is plain instructions written TO the agent (imperative voice): when to use the
 skill, the procedure to follow, and how to handle inputs and edge cases.
