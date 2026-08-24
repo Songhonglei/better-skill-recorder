@@ -5,6 +5,7 @@ import { Library } from "./Library";
 import { Recorder } from "./Recorder";
 import { RecordingControls } from "./RecordingControls";
 import { LanguageProvider, LanguageSwitcher, UiLocalizer } from "./i18n";
+import { getUiTheme, ThemeProvider, ThemeSwitcher } from "./theme";
 import "./App.css";
 
 const root = document.getElementById("root");
@@ -18,14 +19,22 @@ document.body.dataset.route = isLibrary
   : isRecordingControls
     ? "recording-controls"
     : "recorder";
+document.body.dataset.theme = getUiTheme();
 
 createRoot(root).render(
   <React.StrictMode>
-    <LanguageProvider>
-      <UiLocalizer>
-        {!isRecordingControls && <LanguageSwitcher />}
-        {isLibrary ? <Library /> : isRecordingControls ? <RecordingControls /> : <Recorder />}
-      </UiLocalizer>
-    </LanguageProvider>
+    <ThemeProvider>
+      <LanguageProvider>
+        <UiLocalizer>
+          {!isRecordingControls && (
+            <div className="interface-controls">
+              <ThemeSwitcher />
+              <LanguageSwitcher />
+            </div>
+          )}
+          {isLibrary ? <Library /> : isRecordingControls ? <RecordingControls /> : <Recorder />}
+        </UiLocalizer>
+      </LanguageProvider>
+    </ThemeProvider>
   </React.StrictMode>,
 );

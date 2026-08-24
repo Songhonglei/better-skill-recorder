@@ -15,7 +15,6 @@ const STORAGE_KEY = "better-skill-recorder.language";
 const LANGUAGE_EVENT = "better-skill-recorder-language-change";
 
 const ZH: Record<string, string> = {
-  "CAPTURE → UNDERSTAND → BUILD": "录制 → 理解 → 构建",
   "FIELD RECORDER / 01": "现场记录 / 01",
   "Recordings": "录制记录",
   "Model management": "模型管理",
@@ -576,29 +575,20 @@ export function UiLocalizer({ children }: { children: ReactNode }) {
 
 export function LanguageSwitcher() {
   const { language, setLanguage } = useLanguage();
+  const next = language === "en" ? "zh-CN" : "en";
+  const label = language === "zh-CN"
+    ? "当前为中文，点击切换为 English"
+    : "Current language is English. Switch to Chinese";
   return (
-    <div
-      className="language-switcher"
-      role="group"
-      aria-label={language === "zh-CN" ? "界面语言" : "Interface language"}
+    <button
+      type="button"
+      className="interface-control language-switcher"
       data-no-localize
+      aria-label={label}
+      title={label}
+      onClick={() => setLanguage(next)}
     >
-      <button
-        type="button"
-        className={language === "en" ? "active" : ""}
-        aria-pressed={language === "en"}
-        onClick={() => setLanguage("en")}
-      >
-        EN
-      </button>
-      <button
-        type="button"
-        className={language === "zh-CN" ? "active" : ""}
-        aria-pressed={language === "zh-CN"}
-        onClick={() => setLanguage("zh-CN")}
-      >
-        中文
-      </button>
-    </div>
+      {language === "en" ? "EN" : "中"}
+    </button>
   );
 }

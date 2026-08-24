@@ -43,13 +43,33 @@ import { skillPlacementModel, skillTargetFor } from "./skill-placement";
 import { SensitiveReview } from "./SensitiveReview";
 import { ProviderSettings } from "./ProviderSettings";
 import { useLanguage } from "./i18n";
-import brandMark from "./assets/brand-mark.png";
 
 type LibraryView = "sessions" | "model";
 
 const RecorderMark = () => (
   <span className="lib-mark" aria-hidden>
-    <img src={brandMark} alt="" />
+    <svg viewBox="0 0 64 64" focusable="false">
+      <defs>
+        <linearGradient id="brand-pulse" x1="0" y1="0" x2="0" y2="1">
+          <stop stopColor="#c7fff7" />
+          <stop offset="0.42" stopColor="#7ff5e4" />
+          <stop offset="1" stopColor="#39cdbd" />
+        </linearGradient>
+        <radialGradient id="brand-breath" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(32 32) rotate(90) scale(8)">
+          <stop stopColor="#ff796a" />
+          <stop offset="0.72" stopColor="#f04432" />
+          <stop offset="1" stopColor="#cf2e21" />
+        </radialGradient>
+      </defs>
+      <g className="brand-pulses" fill="url(#brand-pulse)">
+        <rect x="27.5" y="4" width="9" height="19" rx="4.5" />
+        <rect x="27.5" y="41" width="9" height="19" rx="4.5" />
+        <rect x="7" y="22.5" width="9" height="19" rx="4.5" />
+        <rect x="48" y="22.5" width="9" height="19" rx="4.5" />
+      </g>
+      <circle className="brand-breath" cx="32" cy="32" r="6.5" fill="url(#brand-breath)" />
+      <circle cx="30.2" cy="29.8" r="1.5" fill="#ffd4ce" fillOpacity="0.86" />
+    </svg>
   </span>
 );
 
@@ -118,7 +138,6 @@ export function Library() {
           <RecorderMark />
           <span>
             <strong>Better Skill Recorder</strong>
-            <small>CAPTURE → UNDERSTAND → BUILD</small>
           </span>
         </div>
         <nav className="lib-nav" aria-label="Library sections">
