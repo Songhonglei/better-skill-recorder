@@ -3,7 +3,7 @@
 **Preview V0.1.0 · Apple Silicon · Unsigned Preview**
 
 [项目主页 / Website](https://songhonglei.github.io/better-skill-recorder/) ·
-[下载预览版 / Download](https://github.com/Songhonglei/better-skill-recorder/releases/tag/v0.1.0-preview.1) ·
+[下载预览版 / Download](https://github.com/Songhonglei/better-skill-recorder/releases/tag/preview-v0.1.0) ·
 [中文安装与使用说明](docs/GETTING_STARTED.zh-CN.md) ·
 [高级设置](docs/ADVANCED_SETTINGS.md)
 
@@ -59,7 +59,7 @@ service. Install only a release downloaded from this repository and verify its S
 checksum first.
 
 1. Download the `macOS-arm64` ZIP and `SHA256SUMS.txt` from the
-   [Preview V0.1.0 release](https://github.com/Songhonglei/better-skill-recorder/releases/tag/v0.1.0-preview.1)
+   [Preview V0.1.0 release](https://github.com/Songhonglei/better-skill-recorder/releases/tag/preview-v0.1.0)
 2. Verify the download:
 
    ```bash

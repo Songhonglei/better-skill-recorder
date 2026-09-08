@@ -2,7 +2,7 @@
 
 **Unsigned Preview · Apple Silicon Mac only · Not notarized by Apple**
 
-内部版本 / Git tag：`0.1.0-preview.1` / `v0.1.0-preview.1`
+内部版本 / Git tag：`0.1.0-preview.1` / `preview-v0.1.0`
 
 这是 Better Skill Recorder 独立预览版本线的起点，并非回退到上游旧功能版本
 

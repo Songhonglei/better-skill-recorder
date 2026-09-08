@@ -20,7 +20,7 @@ administrator rather than weakening system security.
 
 ## Download and verify
 
-1. Open [Preview V0.1.0](https://github.com/Songhonglei/better-skill-recorder/releases/tag/v0.1.0-preview.1)
+1. Open [Preview V0.1.0](https://github.com/Songhonglei/better-skill-recorder/releases/tag/preview-v0.1.0)
 2. Download the macOS ARM64 ZIP and `SHA256SUMS.txt`
 3. In Terminal, calculate the ZIP checksum:
 

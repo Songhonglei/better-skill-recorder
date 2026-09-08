@@ -97,8 +97,8 @@ its notes must disclose which clean-machine tests are still pending:
 
 ```bash
 release_commit="$(git rev-parse HEAD)"
-git tag -a v0.1.0-preview.1 "$release_commit" -m "Preview V0.1.0"
-git push origin HEAD:main refs/tags/v0.1.0-preview.1
+git tag -a preview-v0.1.0 "$release_commit" -m "Preview V0.1.0"
+git push origin HEAD:main refs/tags/preview-v0.1.0
 ```
 
 Attach the macOS ARM64 ZIP and `SHA256SUMS.txt`. The app includes version-matched

@@ -4,7 +4,7 @@
 
 ## 下载与安装
 
-- [下载 Preview V0.1.0](https://github.com/Songhonglei/better-skill-recorder/releases/tag/v0.1.0-preview.1)
+- [下载 Preview V0.1.0](https://github.com/Songhonglei/better-skill-recorder/releases/tag/preview-v0.1.0)
 - 仅支持 Apple Silicon Mac（M 系列），不提供 Intel Mac、Windows 或 Linux 安装包
 - 普通用户不需要 Node、npm 或 GitHub Copilot；这些开发工具不是安装前提
 - 这是 **Unsigned Preview**：采用临时签名，未经 Apple Developer ID 签名和公证，尚未完成独立干净 Mac 的全流程验收
