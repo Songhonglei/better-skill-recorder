@@ -25,8 +25,9 @@ export function resolveMacOSWindowBinaryPath(
 }
 
 export function macOSWindowArguments(options: MacOSWindowOptions): string[] {
-  const args: string[] = [];
-  if (!options.accessibilityPermission) args.push("--no-accessibility-permission");
+  // URLs are collected by our dedicated Apple Events provider. The helper's
+  // unused URL reader prompts for Accessibility on every new capture session.
+  const args: string[] = ["--no-accessibility-permission"];
   if (!options.screenRecordingPermission) args.push("--no-screen-recording-permission");
   return args;
 }
@@ -40,7 +41,10 @@ export async function readMacOSActiveWindow(
   options: MacOSWindowOptions,
 ): Promise<ActiveWindowResult | undefined> {
   const binary = resolveMacOSWindowBinaryPath();
-  const { stdout } = await execFile(binary, macOSWindowArguments(options));
+  const { stdout } = await execFile(binary, macOSWindowArguments(options), {
+    timeout: 5_000,
+    maxBuffer: 1024 * 1024,
+  });
   const parsed = JSON.parse(stdout) as ActiveWindowResult | null;
   return parsed ?? undefined;
 }

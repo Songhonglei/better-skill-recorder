@@ -130,7 +130,7 @@ export const nativePayloadCandidates = {
 };
 
 /** Targets that may produce a redistributable artifact and must pass full source preparation. */
-export const releaseTargets = ["win32-x64", "win32-arm64", "darwin-arm64"];
+export const releaseTargets = ["darwin-arm64"];
 
 /**
  * npm does not persist the `libc` field into `package-lock.json`, so `npm ci` installs both
@@ -832,18 +832,22 @@ export function assertReviewedTessdataPins(source, tessdata) {
 export async function prepareCompliance({
   rootDir = repositoryRoot,
   outputDir = complianceOutput,
-  includeSources = true,
+  sourceMode,
+  includeSources,
   fetchImpl = globalThis.fetch,
 } = {}) {
   if (typeof fetchImpl !== "function") throw new Error("A Fetch API implementation is required.");
 
+  const effectiveSourceMode = sourceMode ?? (includeSources === false ? "none" : "embedded");
   const policy = readJson(path.join(rootDir, "third_party", "compliance-policy.json"));
   const lock = readJson(path.join(rootDir, "package-lock.json"));
   const manifest = readJson(path.join(rootDir, "package.json"));
   const target = `${process.platform}-${process.arch}`;
   assertWasmExcludedFromPackaging(manifest.build);
   assertLockfileClosure(lock);
-  if (includeSources && !releaseTargets.includes(target)) {
+  const includeSourceManifest =
+    effectiveSourceMode === "embedded" || effectiveSourceMode === "network";
+  if (includeSourceManifest && !releaseTargets.includes(target)) {
     throw new Error(
       `${target} is not a supported release target (${releaseTargets.join(", ")}). Run ` +
         "compliance:licenses instead of preparing a redistributable bundle.",
@@ -882,6 +886,7 @@ export async function prepareCompliance({
   const native = collectNativeComponents(packages, lock, {
     platform: process.platform,
     arch: process.arch,
+    sourceMode: effectiveSourceMode,
   });
   await writeFile(
     path.join(outputDir, "NATIVE-THIRD-PARTY-NOTICES.md"),
@@ -910,7 +915,7 @@ export async function prepareCompliance({
     materials: remoteMaterials,
   });
 
-  const sourceManifest = includeSources
+  const sourceManifest = effectiveSourceMode === "embedded"
     ? await prepareSources({
         outputDir,
         rootDir,
@@ -919,9 +924,11 @@ export async function prepareCompliance({
         nativeVersions: native.versions,
         fetchImpl,
       })
-    : { schemaVersion: 1, mode: "licenses-only", sources: [] };
+    : effectiveSourceMode === "network"
+      ? prepareNetworkSourceManifest({ policy, lock, nativeVersions: native.versions })
+      : { schemaVersion: 1, mode: "licenses-only", sources: [] };
   await writeJson(path.join(outputDir, "SOURCE-MANIFEST.json"), sourceManifest);
-  if (includeSources) {
+  if (includeSourceManifest) {
     await prepareElectronNotices({ outputDir, rootDir, policy, fetchImpl });
   }
 
@@ -932,13 +939,13 @@ export async function prepareCompliance({
   );
   await writeFile(
     path.join(outputDir, "COMPLIANCE-README.md"),
-    renderComplianceReadme(includeSources),
+    renderComplianceReadme(effectiveSourceMode),
     "utf8",
   );
 
   await verifyComplianceDirectory(outputDir, {
-    requireSources: includeSources,
-    requireElectronNotices: includeSources,
+    requireSources: includeSourceManifest ? effectiveSourceMode : false,
+    requireElectronNotices: includeSourceManifest,
   });
   return {
     packageCount: inventory.length,
@@ -950,7 +957,7 @@ export async function prepareCompliance({
 export async function verifyComplianceDirectory(
   directory,
   {
-    requireSources = true,
+    requireSources = "embedded",
     requireElectronNotices = false,
     requireRemoteMaterials = true,
   } = {},
@@ -999,13 +1006,15 @@ export async function verifyComplianceDirectory(
   }
 
   const sources = readJson(path.join(directory, "SOURCE-MANIFEST.json"));
-  if (requireSources && sources.mode !== "full") {
-    throw new Error("Release compliance requires full corresponding sources.");
+  const expectedSourceMode = requireSources === true ? "embedded" : requireSources;
+  const manifestMode = sources.mode === "full" ? "embedded" : sources.mode;
+  if (expectedSourceMode && manifestMode !== expectedSourceMode) {
+    throw new Error(`Release compliance requires ${expectedSourceMode} corresponding sources.`);
   }
-  if (requireSources && (!Array.isArray(sources.sources) || sources.sources.length < 30)) {
+  if (expectedSourceMode && (!Array.isArray(sources.sources) || sources.sources.length < 30)) {
     throw new Error("Corresponding-source manifest is incomplete.");
   }
-  if (requireSources) {
+  if (expectedSourceMode) {
     const native = readJson(path.join(directory, "NATIVE-COMPONENTS.json"));
     const lock = readJson(path.join(repositoryRoot, "package-lock.json"));
     const expectedSources = buildComplianceSourceSpecs(
@@ -1022,13 +1031,16 @@ export async function verifyComplianceDirectory(
   }
   for (const source of sources.sources ?? []) {
     if (
-      requireSources &&
+      expectedSourceMode &&
       source.sha256 !==
         reviewedMaterialHash(source.id, policy.sourceMaterials, "Source material")
     ) {
       throw new Error(`Source material ${source.id} does not match its reviewed SHA-256.`);
     }
-    await verifyManifestFile(directory, source);
+    if (manifestMode === "embedded") await verifyManifestFile(directory, source);
+    else if (manifestMode === "network" && !/^https:\/\//.test(source.url ?? "")) {
+      throw new Error(`Network source material ${source.id} has no HTTPS URL.`);
+    }
   }
 
   if (requireElectronNotices) {
@@ -1133,8 +1145,6 @@ function collectProductionPackages(rootDir, lock) {
 }
 
 function validateReviewedVersions(packages, lock, policy, rootDir) {
-  assertInstalledVersion(packages, "@github/copilot-sdk", policy.copilotSdk);
-  assertReviewedCopilotCliVersions(lock, policy.copilotCli);
   assertInstalledVersion(packages, "sharp", policy.sharp);
   for (const name of [
     "@secretlint/core",
@@ -1176,27 +1186,6 @@ function validateReviewedVersions(packages, lock, policy, rootDir) {
 
   for (const pkg of packages.filter(({ name }) => name.startsWith("onnxruntime-"))) {
     onnxRefForVersion(pkg.version, policy);
-  }
-}
-
-export function assertReviewedCopilotCliVersions(lock, expected) {
-  const versions = new Set(
-    Object.entries(lock.packages ?? {})
-      .filter(
-        ([lockPath]) =>
-          lockPath === "node_modules/@github/copilot" ||
-          /^node_modules\/@github\/copilot-(?:darwin|linux|linuxmusl|win32)-/.test(
-            lockPath,
-          ),
-      )
-      .map(([, entry]) => entry.version),
-  );
-  if (versions.size !== 1 || !versions.has(expected)) {
-    throw new Error(
-      `GitHub Copilot CLI versions have not been reviewed: ${
-        [...versions].join(", ") || "(missing)"
-      }; expected ${expected}.`,
-    );
   }
 }
 
@@ -1275,16 +1264,6 @@ function buildLicenseInventory(rootDir, packages, policy) {
         licenseSource: "koffi/LICENSE.txt",
         text: readFileSync(parent, "utf8").trim(),
       };
-    }
-
-    if (pkg.name === "@github/copilot-sdk") {
-      if (pkg.version !== policy.copilotSdk) {
-        throw new Error(`No reviewed Copilot SDK license override exists for ${pkg.version}.`);
-      }
-      return overrideEntry(
-        pkg,
-        path.join(rootDir, "third_party", "package-licenses", "github-copilot-sdk-MIT.txt"),
-      );
     }
 
     if (pkg.name.startsWith("onnxruntime-")) {
@@ -1577,7 +1556,14 @@ export function assertLockfileClosure(lock) {
 
   const gaps = [];
   for (const [from, entry] of Object.entries(packages)) {
-    const required = { ...entry?.dependencies, ...entry?.optionalDependencies };
+    const packageName = from.startsWith("node_modules/")
+      ? from.slice("node_modules/".length).split("/node_modules/").at(-1)
+      : "";
+    if (excludedWasmPackages.includes(packageName)) continue;
+    // This product currently ships only the macOS arm64 artifact. npm may omit
+    // optional packages for other platforms (and optional fallback codecs) from
+    // a host-generated lockfile; only hard dependency gaps block this release.
+    const required = { ...entry?.dependencies };
     for (const dependency of Object.keys(required)) {
       if (!resolveFrom(from, dependency)) {
         gaps.push(`${from || "<root>"} -> ${dependency}`);
@@ -1610,7 +1596,7 @@ function nativePayloadBinaries(directory) {
   return binaries.sort((a, b) => a.file.localeCompare(b.file));
 }
 
-function collectNativeComponents(packages, lock, { platform, arch }) {
+function collectNativeComponents(packages, lock, { platform, arch, sourceMode = "embedded" }) {
   const payload = selectNativePayload(packages, { platform, arch });
   const versionsFile = path.join(payload.directory, "versions.json");
   const versions = readJson(versionsFile);
@@ -1645,8 +1631,11 @@ function collectNativeComponents(packages, lock, { platform, arch }) {
       "# Native Third-Party Notices",
       "",
       "The following upstream notices describe libraries embedded in the Sharp/libvips",
-      `native payload \`${payload.name}@${payload.version}\`. Full source archives and`,
-      "license files accompany this application under `sources/`; canonical copyleft license",
+      `native payload \`${payload.name}@${payload.version}\`. ${
+        sourceMode === "network"
+          ? "Immutable source locations and reviewed hashes are listed in `SOURCE-MANIFEST.json`;"
+          : "Full source archives and license files accompany this application under `sources/`;"
+      } canonical copyleft license`,
       "texts are under `licenses/`.",
       "",
       notices,
@@ -1769,6 +1758,24 @@ async function prepareSources({
     };
   });
   return { schemaVersion: 1, mode: "full", sources };
+}
+
+function prepareNetworkSourceManifest({ policy, lock, nativeVersions }) {
+  const specs = buildComplianceSourceSpecs(nativeVersions, lock, policy, process.platform);
+  return {
+    schemaVersion: 1,
+    mode: "network",
+    responsibility:
+      "Better Skill Recorder distributes exact version and integrity directions to immutable upstream source locations.",
+    sources: specs.map((spec) => ({
+      id: spec.id,
+      version: spec.version,
+      reason: spec.reason,
+      url: spec.url,
+      retrieval: spec.gitRepository ? "git-archive" : "download",
+      sha256: reviewedMaterialHash(spec.id, policy.sourceMaterials, "Source material"),
+    })),
+  };
 }
 
 async function prepareElectronNotices({ outputDir, rootDir, policy, fetchImpl }) {
@@ -2006,6 +2013,7 @@ export function renderRelinking(native, sourceManifest, policy, platform = proce
     if (!source && sourceManifest.mode === "full") {
       throw new Error(`Relinking guide requires source material ${id}.`);
     }
+    if (sourceManifest.mode === "network") return source?.url ?? `[${id} source URL missing]`;
     return source?.file ?? `sources/[${id} omitted from licenses-only bundle]`;
   };
   const hasWindowsBuildSource = sourceManifest.sources.some(
@@ -2054,8 +2062,12 @@ export function renderRelinking(native, sourceManifest, policy, platform = proce
     "modified replacement from running. You may also reverse engineer Better Skill Recorder to",
     "the extent necessary to debug modifications you make to those libraries.",
     "",
-    "Exact upstream sources, packaging scripts, and build patches are included under",
-    "`sources/`. `SOURCE-MANIFEST.json` records their original URLs and SHA-256 hashes.",
+    sourceManifest.mode === "network"
+      ? "Exact upstream source URLs, packaging scripts, build patches, and reviewed hashes are"
+      : "Exact upstream sources, packaging scripts, and build patches are included under",
+    sourceManifest.mode === "network"
+      ? "recorded in `SOURCE-MANIFEST.json`; download them before following the steps below."
+      : "`sources/`. `SOURCE-MANIFEST.json` records their original URLs and SHA-256 hashes.",
     "",
     "To rebuild and replace the libvips payload:",
     "",
@@ -2064,8 +2076,12 @@ export function renderRelinking(native, sourceManifest, policy, platform = proce
       : `1. Unpack \`${sharpBuildSource}\`. It contains the`,
     hasWindowsBuildSource
       ? "   MXE cross-build definitions and every patch applied to the Windows payload."
-      : "   POSIX build scripts; externally fetched patches are included beside it in `sources/`.",
-    "2. Unpack the matching upstream archives from `sources/` into the build tree, keeping",
+      : sourceManifest.mode === "network"
+        ? "   POSIX build scripts; externally fetched patches are pinned in `SOURCE-MANIFEST.json`."
+        : "   POSIX build scripts; externally fetched patches are included beside it in `sources/`.",
+    sourceManifest.mode === "network"
+      ? "2. Download and unpack the matching upstream archives from `SOURCE-MANIFEST.json`, keeping"
+      : "2. Unpack the matching upstream archives from `sources/` into the build tree, keeping",
     "   the versions recorded below and in `NATIVE-COMPONENTS.json`.",
     "3. Run the packaging build for this platform and architecture as documented by the",
     "   unpacked scripts.",
@@ -2088,12 +2104,15 @@ export function renderRelinking(native, sourceManifest, policy, platform = proce
     "",
     sourceManifest.mode === "full"
       ? "This distribution includes the corresponding-source materials."
-      : "This licenses-only bundle is not suitable for redistribution.",
+      : sourceManifest.mode === "network"
+        ? "This distribution provides immutable upstream source locations and reviewed hashes."
+        : "This licenses-only bundle is not suitable for redistribution.",
     "",
   ].join("\n");
 }
 
-function renderComplianceReadme(includeSources) {
+function renderComplianceReadme(sourceMode) {
+  const redistributable = sourceMode === "embedded" || sourceMode === "network";
   return [
     "# License and source materials",
     "",
@@ -2103,16 +2122,18 @@ function renderComplianceReadme(includeSources) {
     "- `NATIVE-THIRD-PARTY-NOTICES.md` identifies libraries embedded in native payloads.",
     "- `onnxruntime/` contains exact ONNX Runtime third-party notices.",
     "- `tesseract-core/` contains notices for libraries embedded in the OCR WebAssembly.",
-    includeSources
+    redistributable
       ? "- `electron/` contains the exact Electron and Chromium notices from this build."
       : "- Electron notices are added when a redistributable build is prepared.",
     "- `licenses/` contains complete GPL, LGPL, MPL, and Artistic-2.0 license texts.",
     "- `RELINKING.md` explains replacement and relinking of native libraries.",
     "- `SOURCE-MANIFEST.json` maps corresponding-source archives to their origins.",
     "",
-    includeSources
+    sourceMode === "embedded"
       ? "The `sources/` directory accompanies this redistributable build."
-      : "This development bundle omits sources and must not be redistributed.",
+      : sourceMode === "network"
+        ? "`SOURCE-MANIFEST.json` provides immutable upstream download locations and reviewed SHA-256 hashes."
+        : "This development bundle omits sources and must not be redistributed.",
     "",
   ].join("\n");
 }

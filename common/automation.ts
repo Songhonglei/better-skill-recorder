@@ -5,7 +5,7 @@ import { migrateLegacyInputsToValues, renderValues, ValueSchema } from "./values
 
 /**
  * The Automation Builder's contract — the automation-flavoured sibling of
- * `skill.ts`. From an *approved* {@link Analysis} the multi-turn Copilot agent
+ * `skill.ts`. From an *approved* {@link Analysis} the configured model
  * first proposes a **plan** ({@link AutomationPlan}) — a **trigger** (a schedule
  * it proposes, refinable in natural language) plus the generalized, ordered
  * **steps** (each a natural-language prompt to the target agent) — which the user

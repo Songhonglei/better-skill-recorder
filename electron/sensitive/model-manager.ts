@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { app } from "electron";
 
 import type {
   SensitiveModelActionResult,
@@ -50,13 +51,30 @@ function settingsFile(): string {
   return path.join(modelsCacheDir(), "advanced-protection.json");
 }
 
-function tessdataDir(): string {
+function cachedTessdataDir(): string {
   return path.join(modelsCacheDir(), "tessdata");
 }
 
-/** True once the English traineddata is on disk and the OCR engine can be built. */
-function isTessdataCached(): boolean {
-  return existsSync(path.join(tessdataDir(), tessdataFileName(OCR_LANGUAGE)));
+/** The packaged language model ships outside ASAR so Tesseract can read it directly. */
+function bundledTessdataDir(): string {
+  const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
+  const packaged = resourcesPath ? path.join(resourcesPath, "models", "tessdata") : "";
+  if (packaged && existsSync(path.join(packaged, tessdataFileName(OCR_LANGUAGE)))) {
+    return packaged;
+  }
+  return path.join(app.getAppPath(), "electron", "assets", "models", "tessdata");
+}
+
+/** Prefer the built-in model; retain the old cache as a repair/development fallback. */
+function availableTessdataDir(): string | null {
+  for (const directory of [bundledTessdataDir(), cachedTessdataDir()]) {
+    if (existsSync(path.join(directory, tessdataFileName(OCR_LANGUAGE)))) return directory;
+  }
+  return null;
+}
+
+function isTessdataAvailable(): boolean {
+  return availableTessdataDir() !== null;
 }
 
 interface AdvancedSettings {
@@ -91,7 +109,7 @@ async function downloadTessdata(
   code: string,
   onProgress?: (percent: number) => void,
 ): Promise<void> {
-  const dir = tessdataDir();
+  const dir = cachedTessdataDir();
   await mkdir(dir, { recursive: true });
   const dest = path.join(dir, tessdataFileName(code));
   const tmp = `${dest}.tmp.${process.pid}.${Date.now()}`;
@@ -124,11 +142,9 @@ async function downloadTessdata(
  * images, behind a single persisted `enabled` flag. That flag is the ONE opt-out for
  * all on-device protection: when on (the default) the analyze pipeline both masks
  * secrets/PII in the outgoing text and blurs them in screen images; when the user turns
- * it off, neither is applied and the recording is sent unredacted. On first launch, when
- * enabled but the data is not cached yet, the small (~few MB) model is fetched
- * automatically in the background so "on by default" actually protects the very first
- * analysis; Analyze then waits briefly (bounded) for that provisioning to finish rather
- * than dropping frames, and only withholds them if the model still is not ready in time.
+ * it off, neither is applied and the recording is sent unredacted. The small English
+ * language model is bundled with the macOS application, so protection works offline on
+ * the first launch. A verified download remains only as a repair/development fallback.
  * Disabling keeps the cache so re-enabling is instant. Never throws into the Analyze
  * path: `getOcr` returns null when unavailable.
  */
@@ -160,7 +176,7 @@ export class SensitiveModelManager {
    *  so the default-on layer is actually functional. */
   initialize(): void {
     const settings = readSettings();
-    const cached = isTessdataCached();
+    const cached = isTessdataAvailable();
     this.current = {
       enabled: settings.enabled,
       ocr: cached ? "ready" : "missing",
@@ -199,7 +215,7 @@ export class SensitiveModelManager {
     if (!enabled) return this.disable();
 
     const gen = ++this.ocrGen;
-    const cached = isTessdataCached();
+    const cached = isTessdataAvailable();
     this.update({
       enabled: true,
       ocr: cached ? "ready" : "missing",
@@ -270,7 +286,7 @@ export class SensitiveModelManager {
     const gen = this.ocrGen;
     this.update({ error: null });
     try {
-      if (!isTessdataCached()) {
+      if (!isTessdataAvailable()) {
         this.update({ ocr: "downloading", progress: 0 });
         await downloadTessdata(OCR_LANGUAGE, (p) => this.onDownloadProgress(p));
       }
@@ -304,7 +320,9 @@ export class SensitiveModelManager {
   private buildAndWarmOcr(gen: number): Promise<void> {
     return this.runOcrLifecycle(async () => {
       if (gen !== this.ocrGen || !this.current.enabled) return;
-      const next = new Ocr({ langPath: tessdataDir() });
+      const langPath = availableTessdataDir();
+      if (!langPath) throw new Error("Built-in OCR language data is unavailable.");
+      const next = new Ocr({ langPath });
       try {
         await next.warm();
       } catch (err) {
@@ -368,7 +386,7 @@ export class SensitiveModelManager {
     // falls back to whether the file is present so re-enabling is instant.
     this.update({
       enabled: false,
-      ocr: isTessdataCached() ? "ready" : "missing",
+      ocr: isTessdataAvailable() ? "ready" : "missing",
       progress: null,
       error: null,
     });

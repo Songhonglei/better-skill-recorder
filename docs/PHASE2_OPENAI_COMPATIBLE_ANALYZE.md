@@ -1,5 +1,8 @@
 # OpenAI-compatible provider (Phases 2–4)
 
+> **Historical implementation note.** The current product no longer includes or falls back
+> to GitHub Copilot. Use `MODEL_CONFIGURATION.md` for supported configuration.
+
 Phase 2 added text-only Analyze and feedback. Phase 3 adds default-on frame/image
 analysis plus Skill Builder and Automation Builder through the same OpenAI-compatible
 Chat Completions endpoint. GitHub Copilot remains the default. The installed

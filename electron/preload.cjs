@@ -14,12 +14,17 @@ const IPC = {
   microphoneDevice: "microphone:device",
   microphoneSettingsChanged: "microphone:settings-changed",
   screenSettings: "screen:settings",
+  screenPermissions: "screen:permissions",
+  shortcutStatus: "shortcut:status",
+  appSettings: "app:settings",
+  appSettingsSave: "app:settings-save",
+  shortcutRetry: "shortcut:retry",
+  shortcutCapture: "shortcut:capture",
   screenSource: "screen:source",
   screenSettingsChanged: "screen:settings-changed",
   status: "recorder:status",
   marker: "recorder:marker",
   doctor: "doctor:check",
-  copilotSignIn: "copilot:sign-in",
   statusChanged: "recorder:status-changed",
   recordingPrivacyReviewed: "recorder:privacy-reviewed",
   recordingPrivacyWarningRequested: "recorder:privacy-warning-requested",
@@ -104,6 +109,12 @@ contextBridge.exposeInMainWorld("skillRecorder", {
     return () => ipcRenderer.removeListener(IPC.microphoneSettingsChanged, listener);
   },
   screenSettings: () => ipcRenderer.invoke(IPC.screenSettings),
+  screenPermissions: () => ipcRenderer.invoke(IPC.screenPermissions),
+  shortcutStatus: () => ipcRenderer.invoke(IPC.shortcutStatus),
+  appSettings: () => ipcRenderer.invoke(IPC.appSettings),
+  appSettingsSave: (input) => ipcRenderer.invoke(IPC.appSettingsSave, input),
+  shortcutRetry: () => ipcRenderer.invoke(IPC.shortcutRetry),
+  shortcutCapture: (active) => ipcRenderer.invoke(IPC.shortcutCapture, active),
   selectScreen: (sourceId) => ipcRenderer.invoke(IPC.screenSource, sourceId),
   onScreenSettingsChanged: (cb) => {
     const listener = (_event, status) => cb(status);
@@ -113,7 +124,6 @@ contextBridge.exposeInMainWorld("skillRecorder", {
   status: () => ipcRenderer.invoke(IPC.status),
   marker: (note) => ipcRenderer.invoke(IPC.marker, note),
   doctor: () => ipcRenderer.invoke(IPC.doctor),
-  copilotSignIn: () => ipcRenderer.invoke(IPC.copilotSignIn),
   onStatusChanged: (cb) => {
     const listener = (_event, status) => cb(status);
     ipcRenderer.on(IPC.statusChanged, listener);

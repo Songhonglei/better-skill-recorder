@@ -62,7 +62,7 @@ codesign --verify --deep --strict "release/mac-arm64/Better Skill Recorder.app"
 
 ## Data boundary
 
-Starting or stopping a recording does not contact Copilot or a custom model. A provider
+Starting or stopping a recording does not contact the configured model. A provider
 request begins only after the user chooses **Analyze**, **Test connection**, or a Builder
 action. Analyze may send the captured event timeline, window/document titles, URLs,
 clipboard previews, narration text, and—when Visual analysis is enabled—selected locally

@@ -1,7 +1,7 @@
 /** Provider-neutral JSON Schema accepted by every agent runtime. */
 export type AgentJsonSchema = Record<string, unknown>;
 
-export type AgentProviderId = "copilot" | "openai-compatible";
+export type AgentProviderId = "openai-compatible";
 
 export type AgentToolResultType = "success" | "failure" | "rejected" | "denied" | "timeout";
 

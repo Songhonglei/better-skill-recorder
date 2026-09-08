@@ -12,8 +12,8 @@ import {
 } from "../../common/analysis";
 import type { AnalyzeProgress } from "../../common/ipc";
 import type { SessionMeta } from "../../common/types";
-import { CopilotAgentRuntime } from "../agent-runtime/copilot-runtime";
 import type { AgentRuntime, AgentSession } from "../agent-runtime/types";
+import { createAnalyzeRuntime } from "../agent-runtime/runtime-factory";
 import { FrameExtractor } from "../frames/extractor";
 import { createLogger } from "../logger";
 import { sessionsRoot, sessionDir, isValidSessionId } from "../recorder/session-store";
@@ -100,11 +100,14 @@ export class Describer {
   private model: string | undefined;
   private readonly live = new Map<string, LiveSession>();
   private readonly active = new Set<string>();
+  private runtime: AgentRuntime;
 
   constructor(
     private readonly emitProgress: (p: AnalyzeProgress) => void,
-    private runtime: AgentRuntime = new CopilotAgentRuntime("Describer"),
-  ) {}
+    runtime?: AgentRuntime,
+  ) {
+    this.runtime = runtime ?? createAnalyzeRuntime("Describer");
+  }
 
   isBusy(): boolean {
     return this.active.size > 0;

@@ -206,7 +206,7 @@ export class VideoRecorder {
           preload: path.join(dirname, "video", "capture-preload.cjs"),
           contextIsolation: true,
           nodeIntegration: false,
-          sandbox: false,
+          sandbox: true,
           backgroundThrottling: false,
         },
       });

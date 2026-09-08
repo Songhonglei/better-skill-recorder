@@ -1,7 +1,5 @@
 {
   "schemaVersion": 1,
-  "copilotCli": "1.0.71",
-  "copilotSdk": "1.0.7",
   "electron": {
     "version": "43.1.1",
     "ffmpegRevision": "ad41607c61898cf7150e0fb20fe4bbabd44922a3",

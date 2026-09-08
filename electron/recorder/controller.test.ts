@@ -9,6 +9,28 @@ import type { NarrationLanguage } from "../../common/narration";
 import type { MicrophoneDevice } from "../../common/microphone";
 import { RecorderController, type SessionAudioRecorder } from "./controller";
 
+test("short saved recordings are discarded and reported without post-processing", async () => {
+  await withSessionsRoot(async () => {
+    let deleted = "";
+    let noticed = 0;
+    let processed = false;
+    const controller = new RecorderController({
+      resolveConfig: () => ({ ...FULL_CAPTURE }), buildCollectors: () => [],
+      createVideoRecorder: () => ({ start: async () => undefined, stop: async () => ({ startEpoch: 1 }) }),
+      deleteSession: async id => { deleted = id; },
+      minimumRecordingSeconds: () => 100,
+      onShortRecordingDiscarded: seconds => { noticed = seconds; },
+      postProcess: async () => { processed = true; },
+    });
+    assert.equal((await controller.start()).ok, true);
+    assert.equal((await controller.stop()).ok, true);
+    await controller.whenProcessed();
+    assert.ok(deleted);
+    assert.equal(noticed, 100);
+    assert.equal(processed, false);
+  });
+});
+
 class FakeAudioRecorder implements SessionAudioRecorder {
   readonly calls: string[] = [];
   readonly deviceIds: string[] = [];

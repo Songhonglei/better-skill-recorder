@@ -131,7 +131,7 @@ function findingKey(source: SensitiveSource, match: SensitiveMatch): string {
 
 /**
  * Scan one recording for potentially sensitive details in the text that Analyze
- * would send to GitHub Copilot. Scans EVERY string field of every recorded event
+ * would send to the configured analysis endpoint. Scans EVERY string field of every recorded event
  * — the whole payload, not a curated subset — because the describer's get_events
  * tool can surface any payload field (window titles, URLs, clipboard previews,
  * commands, cwd/host/path, markers…); plus transcribed voice narration. Runs the

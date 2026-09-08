@@ -4,7 +4,6 @@
 // chunks back to the main process, which writes them to disk. Channel names
 // mirror electron/audio/recorder.ts.
 const { ipcRenderer } = require("electron");
-const { readFile } = require("node:fs/promises");
 
 /** @type {MediaRecorder | null} */
 let recorder = null;
@@ -214,18 +213,18 @@ function epochNow() {
 }
 
 ipcRenderer.on("audio:decode", async (_event, opts) => {
-  const { id, audioPath, sampleRate, chunkSamples } = opts || {};
+  const { id, encoded, sampleRate, chunkSamples } = opts || {};
   let context = null;
   try {
     if (
       typeof id !== "string" ||
-      typeof audioPath !== "string" ||
+      !(encoded instanceof Uint8Array) ||
+      encoded.byteLength === 0 ||
       !Number.isSafeInteger(sampleRate) ||
       !Number.isSafeInteger(chunkSamples)
     ) {
       throw new Error("Invalid audio decode request.");
     }
-    const encoded = await readFile(audioPath);
     const input = encoded.buffer.slice(
       encoded.byteOffset,
       encoded.byteOffset + encoded.byteLength,

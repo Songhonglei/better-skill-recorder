@@ -702,7 +702,7 @@ export class AudioRecorder {
         preload: path.join(dirname, "audio", "capture-preload.cjs"),
         contextIsolation: true,
         nodeIntegration: false,
-        sandbox: false,
+        sandbox: true,
         backgroundThrottling: false,
       },
     });

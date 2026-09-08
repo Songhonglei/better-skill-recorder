@@ -2,13 +2,16 @@ import {
   app,
   BrowserWindow,
   globalShortcut,
-  ipcMain,
+  dialog,
   Menu,
   safeStorage,
   screen,
   shell,
 } from "electron";
 import path from "node:path";
+import { applicationIpc as ipcMain } from "./trusted-ipc";
+import { appSettings, saveAppSettings } from "./app-settings";
+import { applyShortcutSettings } from "./shortcut-settings";
 
 import { FULL_CAPTURE } from "../common/config";
 import { IPC, type RecorderStatus, type StartResult } from "../common/ipc";
@@ -27,6 +30,9 @@ import { NarrationManager } from "./narration/manager";
 import { SensitiveModelManager } from "./sensitive/model-manager";
 import { RecorderController } from "./recorder/controller";
 import { RecordingPrivacySession } from "./recording-privacy";
+import { pendingProcessing } from "./recorder/processing-journal";
+import { sessionsRoot } from "./recorder/session-store";
+import { cleanExpiredRecordings } from "./recording-retention";
 import { deleteSession } from "./sessions";
 import { SkillBuilder } from "./skillbuilder/builder";
 import { AutomationBuilder } from "./automationbuilder/builder";
@@ -60,9 +66,23 @@ let recordingControlsWindow: BrowserWindow | null = null;
 let recorderHome: Electron.Rectangle | null = null;
 let controlsExpanded = false;
 let quitReady = false;
+let quitting = false;
 let quitTask: Promise<void> | null = null;
 let recordingStartPending = false;
+let retentionRunning = false;
+async function runRecordingRetention(): Promise<void> {
+  if (retentionRunning || quitting || recordingStartPending || recorder.status().state === "recording" || agentWorkIsBusy() || (libraryWindow && !libraryWindow.isDestroyed())) return;
+  retentionRunning = true;
+  try {
+    const removed = await cleanExpiredRecordings(sessionsRoot(), appSettings().recordingRetentionDays,
+      id => quitting || recordingStartPending || recorder.status().state === "recording" || agentWorkIsBusy() || Boolean(libraryWindow && !libraryWindow.isDestroyed()) || narration.isBusyWith(id) || recorder.isProcessing(path.join(sessionsRoot(), id)),
+      dir => shell.trashItem(dir));
+    for (const id of removed) recorder.forgetSession(id);
+    if (removed.length) log.info("Expired recordings moved to Trash:", removed.length);
+  } finally { retentionRunning = false; }
+}
 let providerChangePending = false;
+let agentCredentialHydrated = false;
 let agentSettings: AgentSettingsStore | null = null;
 let describer: Describer;
 let builder: SkillBuilder;
@@ -81,6 +101,15 @@ const screens = new ScreenSourceService((status) =>
   broadcast(IPC.screenSettingsChanged, status),
 );
 const recorder = new RecorderController({
+  minimumRecordingSeconds: () => appSettings().minimumRecordingSeconds,
+  onShortRecordingDiscarded: (seconds) => {
+    if (quitting) return;
+    const zh = app.getLocale().startsWith("zh");
+    void dialog.showMessageBox({ type: "info", title: "Better Skill Recorder",
+      message: zh ? `录制不足 ${seconds} 秒，已丢弃` : `Recording shorter than ${seconds} seconds was discarded`,
+      detail: zh ? "可在高级设置中调整最短录屏时长" : "Change the minimum duration in Advanced settings",
+      buttons: [zh ? "知道了" : "OK"] });
+  },
   resolveConfig: () => ({ ...FULL_CAPTURE }),
   buildCollectors: createCollectors,
   createVideoRecorder: () => new VideoRecorder(),
@@ -89,15 +118,12 @@ const recorder = new RecorderController({
   deleteSession,
   postProcess: async (dir) => {
     await processSession(dir);
-    try {
-      await narration.transcribeIfCached(dir);
-    } catch (err) {
-      log.warn("Cached narration processing failed:", err);
-    }
+    await narration.transcribeIfCached(dir);
   },
 });
 
 async function startRecording(): Promise<StartResult> {
+  if (retentionRunning) return { ok: false, error: "录制归档检查中，请稍后重试 / Retention check in progress" };
   if (recordingStartPending) {
     return { ok: false, error: "Recording is already starting." };
   }
@@ -112,6 +138,8 @@ async function startRecording(): Promise<StartResult> {
       ...microphones.startOptions(),
       ...screenOptions,
     });
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
   } finally {
     recordingStartPending = false;
   }
@@ -146,12 +174,22 @@ async function applyAgentConfiguration(config: AgentRuntimeConfiguration): Promi
   }
 }
 
+async function ensureAgentReady(): Promise<void> {
+  if (retentionRunning) throw new Error("录制归档检查中，请稍后重试 / Retention check in progress");
+  if (agentCredentialHydrated) return;
+  const settings = agentSettings!.snapshot();
+  if (!settings.configured) {
+    throw new Error("Set up your custom model in Model management before continuing.");
+  }
+  await applyAgentConfiguration(agentSettings!.runtimeConfiguration());
+  agentCredentialHydrated = true;
+}
+
 async function testAgentConfiguration(config: AgentRuntimeConfiguration): Promise<string> {
   const factory = createAgentRuntimeFactoryFromConfig(config);
   const runtime = factory.create("SettingsProbe");
   try {
     await runtime.checkConnection();
-    if (runtime.id === "copilot") return "Copilot is ready.";
     let called = false;
     const vision = runtime.capabilities.vision;
     const session = await runtime.createSession({
@@ -209,6 +247,7 @@ async function testAgentConfiguration(config: AgentRuntimeConfiguration): Promis
 
 /** Open, focus, and re-dock the Sessions library window (creating it lazily). */
 function openLibrary(): void {
+  if (quitting) return;
   if (recorder.state === "recording") return;
   if (!recorderWindow || recorderWindow.isDestroyed()) return;
   if (libraryWindow && !libraryWindow.isDestroyed()) {
@@ -247,6 +286,7 @@ function ensureRecordingControlsWindow(): BrowserWindow {
 }
 
 function showRecordingControls(): void {
+  if (quitting) return;
   const win = ensureRecordingControlsWindow();
   clampRecordingControlsWindow(win);
   if (!win.isVisible()) win.showInactive();
@@ -275,6 +315,7 @@ function showRecordingPrivacyWarning(): void {
 }
 
 async function requestStartRecording(): Promise<StartResult> {
+  if (quitting) return { ok: false, error: "The app is closing. Reopen it to record." };
   if (recordingPrivacy.startDecision() === "start") return startRecording();
   showRecordingPrivacyWarning();
   return { ok: false, privacyWarningRequired: true };
@@ -282,6 +323,7 @@ async function requestStartRecording(): Promise<StartResult> {
 
 /** Keep the full HUD and compact overlay mutually exclusive. */
 function syncRecordingWindows(status: RecorderStatus): void {
+  if (quitting) return;
   if (status.state === "recording") {
     if (libraryWindow && !libraryWindow.isDestroyed()) libraryWindow.close();
     if (recorderWindow && !recorderWindow.isDestroyed()) recorderWindow.hide();
@@ -355,7 +397,7 @@ app.whenReady().then(async () => {
       process.platform === "linux" ? safeStorageIsUsable(safeStorage) : true,
   });
   const agentRuntimes = createAgentRuntimeFactoryFromConfig(
-    agentSettings.runtimeConfiguration(),
+    agentSettings.runtimeConfiguration({ includeSecureKey: false }),
   );
   describer = new Describer(
     (progress) => broadcast(IPC.analyzeProgress, progress),
@@ -397,6 +439,7 @@ app.whenReady().then(async () => {
     screens,
     sensitiveModels,
     () => recordingStartPending,
+    ensureAgentReady,
   );
   sensitiveModels.initialize();
   ipcMain.handle(IPC.start, () => requestStartRecording());
@@ -443,7 +486,9 @@ app.whenReady().then(async () => {
       }
       agentSettings!.preview(input);
       const settings = agentSettings!.save(input);
+      agentCredentialHydrated = false;
       await applyAgentConfiguration(agentSettings!.runtimeConfiguration());
+      agentCredentialHydrated = true;
       broadcast(IPC.agentSettingsChanged, settings);
       return { ok: true, settings };
     } catch (error) {
@@ -470,7 +515,9 @@ app.whenReady().then(async () => {
       }
       const settings = agentSettings!.reload();
       if (settings.configError) throw new Error(settings.configError);
+      agentCredentialHydrated = false;
       await applyAgentConfiguration(agentSettings!.runtimeConfiguration());
+      agentCredentialHydrated = true;
       broadcast(IPC.agentSettingsChanged, settings);
       return { ok: true, settings };
     } catch (error) {
@@ -484,9 +531,7 @@ app.whenReady().then(async () => {
   ipcMain.handle(IPC.agentSettingsReveal, async () => {
     try {
       const configPath = agentSettings!.snapshot().configPath;
-      if (await shell.openPath(path.dirname(configPath))) {
-        throw new Error("Could not open the configuration folder.");
-      }
+      shell.showItemInFolder(configPath);
       return { ok: true };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
@@ -498,6 +543,14 @@ app.whenReady().then(async () => {
     syncRecordingWindows(status);
   });
   recorderWindow = createRecorderWindow();
+  void runRecordingRetention().then(() => recorder.recoverProcessing(pendingProcessing(sessionsRoot()))).catch((error) => log.warn("Recovery failed:", error));
+  const retentionTimer = setInterval(() => { void runRecordingRetention().catch(error => log.warn("Retention failed:", error)); }, 60 * 60_000);
+  retentionTimer.unref();
+  if (!agentSettings.snapshot().configured) {
+    // First run stays useful offline for recording, but immediately introduces
+    // the one setup required before Analyze and Skill generation.
+    setTimeout(() => openLibrary(), 250);
+  }
 
   const handleDisplayChange = () => {
     clampControlsToDisplay();
@@ -523,11 +576,42 @@ app.whenReady().then(async () => {
     if (status.transition !== "none") return;
     void (status.state === "recording" ? recorder.stop() : requestStartRecording());
   };
-  if (!globalShortcut.register("CommandOrControl+Shift+R", toggle)) {
+  const registerShortcut = () => globalShortcut.isRegistered(appSettings().recordingShortcut) || globalShortcut.register(appSettings().recordingShortcut, toggle);
+  ipcMain.handle(IPC.shortcutStatus, () => globalShortcut.isRegistered(appSettings().recordingShortcut));
+  ipcMain.handle(IPC.appSettings, () => appSettings());
+  ipcMain.handle(IPC.appSettingsSave, (_event, input) => {
+    try {
+      if (recordingStartPending || recorder.status().state === "recording" || recorder.status().transition !== "none") throw new Error("Finish recording before changing global settings");
+      applyShortcutSettings(input, appSettings(), globalShortcut, toggle, saveAppSettings);
+      return { ok: true, settings: appSettings() };
+    } catch (error) { return { ok: false, error: error instanceof Error ? error.message : String(error) }; }
+  });
+  ipcMain.handle(IPC.shortcutRetry, registerShortcut);
+  let endShortcutCapture: (() => void) | undefined;
+  ipcMain.handle(IPC.shortcutCapture, (event, active: boolean) => {
+    if (typeof active !== "boolean") throw new Error("Invalid shortcut capture state");
+    endShortcutCapture?.();
+    if (!active || quitting) return;
+    globalShortcut.unregister(appSettings().recordingShortcut);
+    event.sender.setIgnoreMenuShortcuts(true);
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const restore = () => {
+      if (!event.sender.isDestroyed()) event.sender.setIgnoreMenuShortcuts(false);
+      event.sender.removeListener("destroyed", restore);
+      win?.removeListener("blur", restore);
+      endShortcutCapture = undefined;
+      if (!quitting) registerShortcut();
+    };
+    endShortcutCapture = restore;
+    event.sender.once("destroyed", restore);
+    win?.once("blur", restore);
+  });
+  if (!registerShortcut()) {
     log.warn("Global shortcut registration failed");
   }
 
   app.on("activate", () => {
+    if (quitting) return;
     if (recorder.state === "recording") {
       showRecordingControls();
       return;
@@ -544,12 +628,20 @@ app.on("before-quit", (event) => {
   if (quitReady) return;
   event.preventDefault();
   if (quitTask) return;
+  quitting = true;
   recorder.beginShutdown();
+  globalShortcut.unregisterAll();
+  for (const win of BrowserWindow.getAllWindows()) win.hide();
   quitTask = (async () => {
     // stop() is serialized behind any start/mic/discard operation already in
     // flight, and is a harmless "Not recording" result when the app is idle.
     await recorder.stop();
-    await recorder.whenProcessed();
+    // stop() has finalized capture files; optional processing must not hold quit forever.
+    let deadline: NodeJS.Timeout | undefined;
+    await Promise.race([
+      recorder.whenProcessed(),
+      new Promise<void>((resolve) => { deadline = setTimeout(resolve, 5_000); }),
+    ]).finally(() => { if (deadline) clearTimeout(deadline); });
   })()
     .catch((error) => {
       log.warn("graceful shutdown failed:", error);

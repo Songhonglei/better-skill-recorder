@@ -1,12 +1,15 @@
 {
   "name": "skill-recorder",
-  "version": "0.5.0",
+  "version": "0.1.0-preview.1",
   "description": "Record on-screen work and turn it into reusable AI-agent skills with a configurable model provider.",
   "author": "Skill Recorder contributors",
   "repository": "github:Songhonglei/better-skill-recorder",
+  "homepage": "https://github.com/Songhonglei/better-skill-recorder#readme",
+  "bugs": "https://github.com/Songhonglei/better-skill-recorder/issues",
   "license": "MIT",
   "private": true,
   "type": "module",
+  "packageManager": "npm@11.17.0",
   "main": "dist-electron/main.js",
   "engines": {
     "node": ">=24.19.0 <25",
@@ -17,9 +20,10 @@
     "build:vite": "vite build && node scripts/assert-catalogue-bundle-boundary.mjs",
     "build": "tsc --noEmit && npm run build:vite",
     "check:lockfile": "node scripts/check-lockfile-portability.mjs",
+    "check:sandbox": "node --experimental-transform-types --no-warnings --import ./evals/register.mjs --test electron/renderer-sandbox.test.ts",
     "typecheck": "tsc --noEmit",
     "typecheck:evals": "tsc --noEmit -p evals/tsconfig.json",
-    "test": "node --experimental-transform-types --no-warnings --import ./evals/register.mjs --test evals/builder-imports.test.ts common/architecture-registry.test.ts electron/architectures/catalogue-registry.test.ts common/audio.test.ts common/microphone.test.ts common/screen.test.ts common/narration.test.ts common/sensitive.test.ts electron/copilot-cli-path.test.ts electron/collectors/macos-active-window.test.ts electron/collectors/url-provider.test.ts electron/agent-runtime/copilot-runtime.test.ts electron/agent-runtime/openai-compatible-runtime.test.ts electron/agent-runtime/runtime-factory.test.ts electron/agent-runtime/settings-store.test.ts electron/builders/openai-compatible.test.ts electron/describer/openai-compatible.test.ts electron/recording-controls-bounds.test.ts electron/recorder-window-sizing.test.ts electron/recording-privacy.test.ts electron/crash-guards.test.ts electron/recorder/controller.test.ts electron/recorder/session-store.test.ts electron/frames/extractor.test.ts electron/narration/audio-analysis.test.ts electron/narration/analyze-gate.test.ts electron/narration/transcribe.test.ts electron/narration/whisper.test.ts electron/sensitive/scanner.test.ts electron/sensitive/secrets.test.ts electron/sensitive/tessdata-source.test.ts electron/sensitive/ocr.test.ts electron/sensitive/frame-redact.test.ts electron/sensitive/frame-heuristics.test.ts electron/sessions.test.ts electron/debug-bundle.test.ts electron/skillbuilder/placement.test.ts electron/skillbuilder/universal-package.test.ts src/skill-placement.test.ts scripts/compliance.test.mjs scripts/macos-signing.test.mjs",
+    "test": "node --experimental-transform-types --no-warnings --import ./evals/register.mjs --test evals/builder-imports.test.ts common/architecture-registry.test.ts electron/architectures/catalogue-registry.test.ts common/audio.test.ts common/microphone.test.ts common/screen.test.ts common/narration.test.ts common/sensitive.test.ts electron/collectors/macos-active-window.test.ts electron/collectors/url-provider.test.ts electron/agent-runtime/openai-compatible-runtime.test.ts electron/agent-runtime/runtime-factory.test.ts electron/agent-runtime/settings-store.test.ts electron/builders/openai-compatible.test.ts electron/describer/openai-compatible.test.ts electron/recording-controls-bounds.test.ts electron/recorder-window-sizing.test.ts electron/recording-privacy.test.ts electron/renderer-sandbox.test.ts electron/crash-guards.test.ts electron/recorder/controller.test.ts electron/recorder/session-store.test.ts electron/frames/extractor.test.ts electron/narration/audio-analysis.test.ts electron/narration/analyze-gate.test.ts electron/narration/transcribe.test.ts electron/narration/whisper.test.ts electron/sensitive/scanner.test.ts electron/sensitive/secrets.test.ts electron/sensitive/tessdata-source.test.ts electron/sensitive/ocr.test.ts electron/sensitive/frame-redact.test.ts electron/sensitive/frame-heuristics.test.ts electron/sessions.test.ts electron/debug-bundle.test.ts electron/skillbuilder/placement.test.ts electron/skillbuilder/universal-package.test.ts src/skill-placement.test.ts scripts/compliance.test.mjs scripts/macos-signing.test.mjs",
     "eval": "node --experimental-transform-types --no-warnings --import ./evals/register.mjs evals/run.ts",
     "eval:builder": "node --experimental-transform-types --no-warnings --import ./evals/register.mjs evals/builder/run.ts",
     "eval:skill": "node --experimental-transform-types --no-warnings --import ./evals/register.mjs evals/skillbuilder/run.ts",
@@ -27,37 +31,31 @@
     "eval:sensitive:ocr": "node --experimental-transform-types --no-warnings --import ./evals/register.mjs evals/sensitive/ocr-images.ts",
     "eval:sensitive:realistic": "node --experimental-transform-types --no-warnings --import ./evals/register.mjs evals/sensitive/ocr-realistic.ts",
     "electron:install-reviewed": "node scripts/install-reviewed-electron.mjs",
+    "assets:prepare": "node scripts/prepare-bundled-ocr.mjs",
     "setup:signing:mac": "node scripts/setup-macos-local-signing.mjs",
     "compliance:licenses": "node scripts/prepare-compliance.mjs --licenses-only",
-    "compliance:prepare": "node scripts/prepare-compliance.mjs",
+    "compliance:prepare": "node scripts/prepare-compliance.mjs --network-sources",
     "compliance:review": "node scripts/review-compliance-sources.mjs",
     "compliance:test": "node --test scripts/compliance.test.mjs",
     "fix:lockfile-registry": "node scripts/check-lockfile-portability.mjs --fix",
-    "dist": "npm run compliance:prepare && node scripts/assert-generic-dist-platform.mjs && npm run build:vite && node scripts/run-macos-signed-builder.mjs --publish never",
-    "dist:app:mac": "npm run compliance:prepare && npm run build:vite && node scripts/run-macos-signed-builder.mjs --publish never --mac dir",
-    "dist:win:x64": "npm run compliance:prepare && node scripts/assert-native-windows-arch.mjs x64 && npm run build:vite && electron-builder --config.npmRebuild=false --publish never --win nsis --x64",
-    "dist:win:arm64": "npm run compliance:prepare && node scripts/assert-native-windows-arch.mjs arm64 && npm run build:vite && electron-builder --config.npmRebuild=false --publish never --win nsis --arm64",
-    "dist:portable:mac": "npm run compliance:prepare && npm run build:vite && node scripts/run-macos-signed-builder.mjs --publish never --mac zip",
-    "dist:portable:win": "npm run compliance:prepare && node scripts/assert-native-windows-arch.mjs x64 && npm run build:vite && electron-builder --config.npmRebuild=false --publish never --win portable --x64",
+    "dist": "npm run assets:prepare && npm run compliance:prepare && node scripts/assert-generic-dist-platform.mjs && npm run build:vite && node scripts/run-macos-signed-builder.mjs --publish never --mac --arm64",
+    "dist:app:mac": "npm run assets:prepare && npm run compliance:prepare && npm run build:vite && node scripts/run-macos-signed-builder.mjs --publish never --mac dir --arm64",
+    "dist:portable:mac": "npm run assets:prepare && npm run compliance:prepare && npm run build:vite && node scripts/run-macos-signed-builder.mjs --publish never --mac zip --arm64",
     "start": "node scripts/run-reviewed-electron.mjs start"
   },
   "dependencies": {
-    "@github/copilot-sdk": "^1.0.6",
     "@huggingface/transformers": "^4.2.0",
     "@secretlint/core": "^13.0.4",
     "@secretlint/secretlint-rule-pattern": "^13.0.4",
     "@secretlint/secretlint-rule-preset-recommend": "^13.0.4",
     "archiver": "^8.0.0",
-    "koffi": "^3.1.1",
+    "get-windows": "9.3.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "sharp": "^0.35.3",
     "tesseract.js": "^7.0.0",
     "tesseract.js-core": "^7.0.0",
     "zod": "^4.3.6"
-  },
-  "optionalDependencies": {
-    "get-windows": "^9.3.0"
   },
   "devDependencies": {
     "@electron-internal/extract-zip": "1.0.4",
@@ -77,15 +75,16 @@
   },
   "overrides": {
     "adm-zip": "$adm-zip",
-    "fast-uri": "^3.1.4",
+    "fast-uri": "^3.1.5",
     "global-agent": "^4.1.3",
+    "js-yaml": "^4.3.1",
+    "nanoid": "^3.3.18",
     "sharp": "$sharp",
     "tar": "^7.5.21"
   },
   "allowScripts": {
     "electron-winstaller": false,
     "get-windows@9.3.0": true,
-    "koffi@3.1.1": true,
     "onnxruntime-node@1.24.3": true,
     "protobufjs": false,
     "tesseract.js": false
@@ -107,28 +106,38 @@
       "!node_modules/@img/sharp-wasm32/**",
       "!node_modules/@img/sharp-freebsd-wasm32/**",
       "!node_modules/@img/sharp-webcontainers-wasm32/**",
-      "!node_modules/@emnapi/runtime/**"
+      "!node_modules/@emnapi/runtime/**",
+      "!node_modules/onnxruntime-web/**",
+      "!node_modules/onnxruntime-node/bin/napi-v6/linux/**",
+      "!node_modules/onnxruntime-node/bin/napi-v6/win32/**"
     ],
     "extraResources": [
       {
         "from": ".compliance",
         "to": "compliance"
+      },
+      {
+        "from": "electron/assets/models/tessdata/eng.traineddata",
+        "to": "models/tessdata/eng.traineddata"
       }
     ],
     "asarUnpack": [
-      "node_modules/get-windows/**",
       "node_modules/sharp/**",
       "node_modules/@img/**",
-      "node_modules/koffi/**",
-      "node_modules/@koromix/**",
-      "node_modules/@github/copilot-*/**",
       "node_modules/@huggingface/transformers/**",
       "node_modules/onnxruntime-node/**",
       "node_modules/tesseract.js/**",
-      "node_modules/tesseract.js-core/**"
+      "node_modules/tesseract.js-core/**",
+      "node_modules/get-windows/**"
     ],
     "mac": {
       "icon": "build/icon.png",
+      "artifactName": "Better-Skill-Recorder-${version}-macOS-${arch}-unsigned-preview.${ext}",
+      "electronLanguages": [
+        "en",
+        "zh_CN",
+        "zh_TW"
+      ],
       "target": [
         "dmg",
         "zip"
@@ -142,30 +151,6 @@
         "NSAudioCaptureUsageDescription": "Better Skill Recorder uses the macOS screen-capture framework to record on-screen work. System audio is not recorded."
       }
     },
-    "win": {
-      "icon": "build/icon.png",
-      "files": [
-        "dist/**",
-        "dist-electron/**",
-        "package.json",
-        "LICENSE",
-        "THIRD-PARTY-NOTICES.md",
-        "!node_modules/get-windows/**",
-        "!node_modules/@img/sharp-wasm32/**",
-        "!node_modules/@img/sharp-freebsd-wasm32/**",
-        "!node_modules/@img/sharp-webcontainers-wasm32/**",
-        "!node_modules/@emnapi/runtime/**"
-      ],
-      "target": "nsis",
-      "artifactName": "${productName}-${version}-windows-${arch}.${ext}"
-    },
-    "compression": "normal",
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
-      "installerSidebar": null,
-      "include": "build/installer.nsh"
-    }
+    "compression": "normal"
   }
 }

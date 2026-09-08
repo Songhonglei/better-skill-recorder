@@ -1,18 +1,16 @@
 # Model configuration
 
-Better Skill Recorder can route Analyze, analysis feedback, Skill Builder, and
-Automation Builder through GitHub Copilot or one OpenAI-compatible Chat Completions
-endpoint. Visual analysis is enabled by default for custom models.
-
-![Model control page with an OpenAI-compatible route selected](images/model-control.jpg)
+Better Skill Recorder routes Analyze, analysis feedback, Skill Builder, and Automation
+Builder through one user-configured OpenAI-compatible Chat Completions endpoint. Visual
+analysis can be enabled for models that support inline image input.
 
 ## UI configuration
 
 Open **Sessions → Model control**. The page can:
 
-- select GitHub Copilot or a custom endpoint;
-- set the Base URL and exact model ID;
-- store an API key using Electron `safeStorage` (macOS Keychain / Windows DPAPI);
+- select a preset or enter a custom model ID;
+- set the BaseURL and API key;
+- store an API key using Electron `safeStorage` backed by the macOS keychain;
 - enable or disable visual frame analysis;
 - make a real endpoint + authentication + function-calling test (plus inline image
   transport when Visual analysis is enabled); and
@@ -24,9 +22,9 @@ or Builder turn is active.
 
 ## JSON configuration
 
-The UI displays the active configuration path. By default it is
-`agent-provider.json` inside Electron's per-user application-data directory. Set
-`SKILL_RECORDER_CONFIG_FILE` before launch to use a specific file instead.
+The UI opens the active configuration on request rather than displaying its local path.
+By default it is `agent-provider.json` inside Electron's per-user application-data
+directory. Set `SKILL_RECORDER_CONFIG_FILE` before launch to use a specific file instead.
 
 Start from [`config/agent-provider.example.json`](../config/agent-provider.example.json):
 
@@ -58,14 +56,14 @@ file. When the UI saves a key, encrypted bytes are written to a separate private
 If secure storage is unavailable, the app refuses to persist the key and asks for the
 `SKILL_RECORDER_OPENAI_API_KEY` environment variable instead.
 
-After editing JSON while the app is open, choose **Reload JSON** on Model control.
+After editing JSON while the app is open, choose **Load from configuration file**.
 Invalid files are reported without replacing the active configuration.
 
 ## Model presets
 
 Model choices are not hard-coded in the page component. The packaged defaults come from
 `common/model-presets.defaults.json`; each user's effective list lives in the global
-`openaiCompatible.modelPresets` array shown above. Edit that array and choose **Reload JSON**
+`openaiCompatible.modelPresets` array shown above. Edit that array and reload the configuration
 to add, remove, or rename choices without rebuilding the app. You can always type an exact
 model ID that is not in the list.
 
@@ -82,12 +80,10 @@ and inline-image transport against Alibaba Cloud Token Plan during project valid
 Treat the badge as a tested baseline, not a permanent provider guarantee: deployments and
 model aliases can change, so use **Test connection** with your own endpoint before activation.
 
-![Globally configurable verified model presets](images/model-presets.jpg)
-
 ## Precedence
 
-Process environment has the highest priority, followed by JSON/UI settings, then the
-Copilot default. The UI shows a banner when environment variables override saved fields.
+Process environment has the highest priority, followed by JSON/UI settings, then packaged
+defaults. The UI shows a banner when environment variables override saved fields.
 
 Supported process-only overrides:
 

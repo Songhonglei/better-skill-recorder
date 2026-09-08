@@ -3,9 +3,9 @@ import type { SessionBundle, Step } from "./bundle";
 /**
  * Deterministic, template-based narrative — the always-available baseline
  * describer. No LLM: it renders the validated bundle into a readable
- * `description.md`. The Copilot describer (later) produces a richer narrative and
+ * `description.md`. The configured model (later) produces a richer narrative and
  * drives the opportunistic frame-probe loop, but this guarantees every session
- * yields a description even with no network / no Copilot CLI.
+ * yields a description even with no network or model endpoint.
  */
 
 function fmtDur(ms: number): string {

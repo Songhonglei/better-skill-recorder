@@ -2,22 +2,27 @@
   {
     "id": "qwen3.7-plus",
     "label": "Qwen 3.7 Plus",
+    "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "tokenPlanBaseUrl": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
     "badge": "Q",
-    "source": "Alibaba Cloud Token Plan",
+    "source": "Alibaba Cloud Model Studio",
     "verified": true,
     "capabilities": ["vision", "function-calling", "multi-turn-tools"]
   },
   {
     "id": "qwen3.8-max",
     "label": "Qwen 3.8 Max",
+    "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "tokenPlanBaseUrl": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
     "badge": "Q",
-    "source": "Alibaba Cloud Token Plan",
+    "source": "Alibaba Cloud Model Studio",
     "verified": true,
     "capabilities": ["vision", "function-calling", "multi-turn-tools"]
   },
   {
     "id": "kimi-k2.5",
     "label": "Kimi K2.5",
+    "baseUrl": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
     "badge": "K",
     "source": "Alibaba Cloud Token Plan",
     "verified": true,
@@ -26,6 +31,7 @@
   {
     "id": "kimi-k2.6",
     "label": "Kimi K2.6",
+    "baseUrl": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
     "badge": "K",
     "source": "Alibaba Cloud Token Plan",
     "verified": true,

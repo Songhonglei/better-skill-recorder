@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-Skill Recorder is licensed under the MIT License (see [`LICENSE`](./LICENSE)).
+Better Skill Recorder is licensed under the MIT License (see [`LICENSE`](./LICENSE)).
 
 Packaged/distributed builds include third-party components that are covered by
 their own license terms. This file summarizes the notable ones. Every supported
@@ -31,29 +31,21 @@ Those components remain under their own terms; the generated
   model remains subject to its publisher's applicable terms and does not change
   Skill Recorder's MIT license.
 
+## Bundled English OCR data
+
 ### Tesseract English language data — `tessdata_fast/eng.traineddata`
-- Advanced protection downloads the English OCR data directly from
-  [`tesseract-ocr/tessdata_fast`](https://github.com/tesseract-ocr/tessdata_fast)
-  only when OCR is enabled; it is not bundled with Skill Recorder.
+- The macOS package includes the English OCR data from
+  [`tesseract-ocr/tessdata_fast`](https://github.com/tesseract-ocr/tessdata_fast).
+- The release build downloads it from the immutable revision below, verifies its
+  SHA-256, and then embeds the verified file in the app.
 - The file is pinned to commit
   [`65727574dfcd264acbb0c3e07860e4e9e9b22185`](https://github.com/tesseract-ocr/tessdata_fast/tree/65727574dfcd264acbb0c3e07860e4e9e9b22185)
   and SHA-256
   `7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2`.
 - The language data is Apache-2.0. Its exact license is retained under
-  `resources/compliance/tesseract-core/`, even though the model is fetched
-  from its publisher rather than redistributed in the application.
+  `resources/compliance/tesseract-core/`.
 
 ## Bundled runtime components
-
-### GitHub Copilot CLI — `@github/copilot` (+ platform binary `@github/copilot-<platform>-<arch>`)
-- License: **GitHub Copilot CLI License** (proprietary) — see
-  `node_modules/@github/copilot/LICENSE.md`.
-- Pulled in by `@github/copilot-sdk` (MIT) and spawned as a separate process.
-- Redistribution is permitted **only** as an unmodified copy bundled as part of
-  this application, with the license and all copyright/attribution notices
-  retained. The license explicitly states it does not restrict this
-  application's own license, including distribution under an open-source (MIT)
-  license.
 
 ### Electron / Chromium media codecs
 - License: Electron is **MIT**. Its Chromium runtime includes `ffmpeg.dll`
@@ -78,9 +70,8 @@ Those components remain under their own terms; the generated
   of this app.
 
 ### Sharp / libvips — `sharp` and `@img/sharp-*`
-- `sharp` is **Apache-2.0**. Its Windows native packages are
-  **Apache-2.0 AND LGPL-3.0-or-later**; other platforms load the corresponding
-  **LGPL-3.0-or-later** `@img/sharp-libvips-*` package.
+- `sharp` is **Apache-2.0**. The current macOS ARM64 build loads the corresponding
+  **LGPL-3.0-or-later** `@img/sharp-libvips-darwin-arm64` package.
 - The currently pinned source is Sharp
   [`v0.35.3`](https://github.com/lovell/sharp/tree/v0.35.3), its reproducible
   packaging scripts
@@ -100,10 +91,10 @@ Those components remain under their own terms; the generated
 
 ### ONNX Runtime
 
-`onnxruntime-node`, `onnxruntime-web`, and `onnxruntime-common` are MIT. Their npm
-packages omit standalone license and third-party-notice files, so exact notices
-from each pinned source revision are included under
-`resources/compliance/onnxruntime/`.
+`onnxruntime-node`, `onnxruntime-web`, and `onnxruntime-common` are MIT. The install
+tree may contain shared and Web variants through Transformers.js, but the macOS
+artifact excludes ONNX Web and Linux/Windows native payloads. Exact notices from
+each reviewed source revision are retained under `resources/compliance/onnxruntime/`.
 
 ### Tesseract OCR WebAssembly — `tesseract.js` and `tesseract.js-core`
 
@@ -140,9 +131,8 @@ the FFmpeg archive is deterministically generated from its pinned Git commit.
 and explains how to rebuild and replace them.
 
 ### Other native modules
-- `get-windows` — MIT
-- `koffi` / `@koromix/koffi-*` — MIT; used for Win32 foreground-window calls,
-  including the native Windows ARM64 build.
+- `get-windows` — MIT; used for active-window information on macOS despite the
+  upstream package's historical name
 - `sharp` — Apache-2.0; see the Sharp/libvips section for native payload terms
 
 ## Apache-2.0 components

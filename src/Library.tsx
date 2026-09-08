@@ -5,7 +5,6 @@ import type { AgentProviderSettings } from "../common/provider-settings";
 import type {
   AnalyzeProgress,
   AutomationBuildProgress,
-  CopilotSignInResult,
   NarrationStatus,
   SensitiveReport,
   SessionSummary,
@@ -14,7 +13,6 @@ import type {
   SkillPackageSummary,
   SkillPlacement,
 } from "../common/ipc";
-import { isCopilotSignedOutError } from "../common/ipc";
 import type {
   BuildTarget,
   BuiltSkill,
@@ -42,9 +40,11 @@ import { formatBytes, formatDur, formatWhen, shortLabel } from "./format";
 import { skillPlacementModel, skillTargetFor } from "./skill-placement";
 import { SensitiveReview } from "./SensitiveReview";
 import { ProviderSettings } from "./ProviderSettings";
-import { useLanguage } from "./i18n";
+import { AdvancedSettings } from "./AdvancedSettings";
+import { LanguageSwitcher, useLanguage } from "./i18n";
+import { ThemeSwitcher } from "./theme";
 
-type LibraryView = "sessions" | "model";
+type LibraryView = "sessions" | "model" | "advanced";
 
 const RecorderMark = () => (
   <span className="lib-mark" aria-hidden>
@@ -106,7 +106,10 @@ export function Library() {
   }, [loadSessions]);
 
   useEffect(() => {
-    void window.skillRecorder.agentSettings().then(setProviderSettings);
+    void window.skillRecorder.agentSettings().then((settings) => {
+      setProviderSettings(settings);
+      if (!settings.configured) setView("model");
+    });
     return window.skillRecorder.onAgentSettingsChanged(setProviderSettings);
   }, []);
 
@@ -152,12 +155,14 @@ export function Library() {
               <strong>Model management</strong>
               <span className="lib-nav-model-separator" aria-hidden>·</span>
               <small data-no-localize>
-                {providerSettings?.provider === "openai-compatible"
-                  ? providerSettings.model || (language === "zh-CN" ? "自定义端点" : "Custom endpoint")
-                  : "GitHub Copilot"}
+                {providerSettings?.model || (language === "zh-CN" ? "待配置" : "Setup required")}
               </small>
             </span>
-            <span className={`lib-nav-signal ${providerSettings?.provider === "openai-compatible" ? "custom" : ""}`} aria-hidden />
+            <span className={`lib-nav-signal custom ${providerSettings?.configured ? "" : "needs-setup"}`} aria-hidden />
+          </button>
+          <button className={view === "advanced" ? "active" : ""} onClick={() => setView("advanced")}>
+            <span className="lib-nav-icon" aria-hidden>⚙</span>
+            {language === "zh-CN" ? "高级设置" : "Advanced settings"}
           </button>
         </nav>
         <div className="lib-divider" />
@@ -185,7 +190,11 @@ export function Library() {
         )}
       </aside>
       <main className="lib-detail">
-        {view === "model" ? (
+        <div className="interface-controls">
+          <ThemeSwitcher />
+          <LanguageSwitcher />
+        </div>
+        {view === "advanced" ? <AdvancedSettings /> : view === "model" ? (
           <ProviderSettings initial={providerSettings} onChanged={setProviderSettings} />
         ) : selected ? (
           <AnalysisWorkspace
@@ -193,6 +202,8 @@ export function Library() {
             summary={selected}
             narrationStatus={narrationStatus}
             onChanged={loadSessions}
+            modelConfigured={providerSettings?.configured ?? false}
+            onConfigureModel={() => setView("model")}
           />
         ) : (
           <div className="detail-empty">
@@ -483,53 +494,22 @@ function DebugDownload({ sessionId }: { sessionId: string }) {
   );
 }
 
-/**
- * Error banner for the Copilot-backed panels. When the CLI has no credentials the app
- * offers to open a terminal on its *bundled* Copilot binary — there's no global
- * `copilot` command to send people to.
- */
 function AnalysisError({ error }: { error: string }) {
-  const [signIn, setSignIn] = useState<CopilotSignInResult | null>(null);
-  const [opening, setOpening] = useState(false);
-
-  const openSignIn = async () => {
-    setOpening(true);
-    setSignIn(await window.skillRecorder.copilotSignIn());
-    setOpening(false);
-  };
-
-  if (!isCopilotSignedOutError(error)) return <div className="analysis-error">{error}</div>;
-
-  return (
-    <div className="analysis-error">
-      <p>{error}</p>
-      <div className="signin-row">
-        <button className="row-action" onClick={() => void openSignIn()} disabled={opening}>
-          {opening ? "Opening…" : "Sign in to Copilot"}
-        </button>
-        {signIn?.ok && (
-          <span>A terminal opened — finish signing in there, then try again.</span>
-        )}
-        {signIn && !signIn.ok && <span>{signIn.error ?? "Couldn't open a terminal."}</span>}
-      </div>
-      {signIn?.command && (
-        <>
-          <p className="signin-manual">Or run this command yourself:</p>
-          <code className="signin-command">{signIn.command}</code>
-        </>
-      )}
-    </div>
-  );
+  return <div className="analysis-error">{error}</div>;
 }
 
 function AnalysisWorkspace({
   summary,
   narrationStatus,
   onChanged,
+  modelConfigured,
+  onConfigureModel,
 }: {
   summary: SessionSummary;
   narrationStatus: NarrationStatus | null;
   onChanged: () => void | Promise<void>;
+  modelConfigured: boolean;
+  onConfigureModel: () => void;
 }) {
   const { language } = useLanguage();
   const sessionId = summary.id;
@@ -792,16 +772,23 @@ function AnalysisWorkspace({
         {summary.processed && !analysis && !analyzing && (
           <div className="ws-empty">
             <p className="ws-empty-lead">See what you did in this recording, step by step.</p>
-            <button className="record-cta" onClick={() => void run()}>
-              Analyze recording
-            </button>
+            {modelConfigured ? (
+              <button className="record-cta" onClick={() => void run()}>
+                Analyze recording
+              </button>
+            ) : (
+              <div className="model-setup-callout">
+                <span aria-hidden>✦</span>
+                <div><strong>Connect a model before analysis</strong><small>Your recording stays local until you choose Analyze.</small></div>
+                <button className="record-cta" onClick={onConfigureModel}>Set up model</button>
+              </div>
+            )}
             <details className="analyze-disclosure">
               <summary>What gets sent for analysis</summary>
               <p>
                 When you choose Analyze, the event timeline (window and document titles, URLs, and
                 clipboard previews), plus screen images, narration text, and other content you
-                provide, are sent to the configured analysis provider. GitHub Copilot cloud is the
-                default; a source preview may use an explicitly configured custom endpoint.{" "}
+                provide, are sent only to the custom endpoint you configured.{" "}
                 <span className="cloud-analysis-caution">
                   Do not analyze a recording that may contain passwords, access tokens, API keys,
                   credentials, secrets, or other sensitive or confidential information.
@@ -1006,12 +993,12 @@ function creationTargetCopy(
 ): { label: string; note: string } {
   if (target.kind === "skill") {
     return language === "zh-CN"
-      ? { label: "按需调用的 Skill", note: "需要时由智能体调用，适合可重复执行的任务。" }
-      : { label: "On-demand Skill", note: "Called by an agent when needed for a repeatable task." };
+      ? { label: "按需调用的 Skill", note: "需要时由智能体调用，适合可重复执行的任务" }
+      : { label: "On-demand Skill", note: "Called by an agent when needed for a repeatable task" };
   }
   return language === "zh-CN"
-    ? { label: "定时 / 自动触发的 Skill", note: "按计划运行，或由触发条件自动启动。" }
-    : { label: "Scheduled / triggered Skill", note: "Runs on a schedule or starts automatically from a trigger." };
+    ? { label: "定时 / 自动触发的 Skill", note: "按计划运行，或由触发条件自动启动" }
+    : { label: "Scheduled / triggered Skill", note: "Runs on a schedule or starts automatically from a trigger" };
 }
 
 function BuildFlowFooter({
@@ -1159,7 +1146,7 @@ function SkillExportSheet({
           <h2 id="skill-export-title">{language === "zh-CN" ? "导出 Skill" : "Export Skill"}</h2>
         </header>
         <p className="sheet-lead">
-          {language === "zh-CN" ? "选择这个 Skill 包的使用方式。" : "Choose how this Skill package will be used."}
+          {language === "zh-CN" ? "选择这个 Skill 包的使用方式" : "Choose how this Skill package will be used"}
         </p>
         <div className="skill-export-options" role="radiogroup">
           {choices.map((choice) => (
@@ -1375,8 +1362,8 @@ function SkillBuilderView({
           <div className="sb-arch">
             <p className="sb-lead">
               {language === "zh-CN"
-                ? "根据这条录制构建按需调用的 Skill。"
-                : "Build an on-demand Skill from this recording."}
+                ? "根据这条录制构建按需调用的 Skill"
+                : "Build an on-demand Skill from this recording"}
             </p>
           </div>
         )}
@@ -1414,7 +1401,7 @@ function SkillBuilderView({
             <div className="sb-sec">
               <span className="eyebrow">What the skill will do</span>
               <p className="sb-refine-hint">
-                Click any step to edit, or a highlighted value to change it. Reorder, add or remove as needed.
+                Click any step to edit, or a highlighted value to change it. Reorder, add or remove as needed
               </p>
               <SkillStepTiles
                 steps={plan.steps}
@@ -1440,11 +1427,11 @@ function SkillBuilderView({
               <code className="sb-slug">{builtName}</code>{" "}
               {placement === "install"
                 ? language === "zh-CN"
-                  ? "已添加到目标 Skill 目录，会自动加载。"
-                  : "is in the target Skill directory and loads automatically."
+                  ? "已添加到目标 Skill 目录，会自动加载"
+                  : "is in the target Skill directory and loads automatically"
                 : language === "zh-CN"
-                  ? "已生成，可以选择分享版或个人版导出。"
-                  : "is ready to export as a share-safe or personal package."}
+                  ? "已生成，可以选择分享版或个人版导出"
+                  : "is ready to export as a share-safe or personal package"}
             </p>
             {skillPackage && (
               <div className="skill-package-ready" role="status">
@@ -1457,11 +1444,11 @@ function SkillBuilderView({
                   </strong>
                   {language === "zh-CN"
                     ? skillPackage.mode === "share"
-                      ? "敏感信息和本地配置已移除，可以交给其他人使用。"
-                      : "保留了敏感信息和本地配置，请仅限自己使用。"
+                      ? "敏感信息和本地配置已移除，可以交给其他人使用"
+                      : "保留了敏感信息和本地配置，请仅限自己使用"
                     : skillPackage.mode === "share"
-                      ? "Sensitive information and local configuration were removed."
-                      : "Sensitive information and local configuration are included. Keep it private."}
+                      ? "Sensitive information and local configuration were removed"
+                      : "Sensitive information and local configuration are included; keep it private"}
                 </p>
               </div>
             )}
@@ -1686,8 +1673,8 @@ function AutomationBuilderView({
           <div className="sb-arch">
             <p className="sb-lead">
               {language === "zh-CN"
-                ? "根据这条录制构建定时 / 自动触发的 Skill。"
-                : "Build a scheduled or automatically triggered Skill from this recording."}
+                ? "根据这条录制构建定时 / 自动触发的 Skill"
+                : "Build a scheduled or automatically triggered Skill from this recording"}
             </p>
           </div>
         )}
@@ -1725,7 +1712,7 @@ function AutomationBuilderView({
             <div className="sb-sec">
               <span className="eyebrow">When it runs</span>
               <p className="sb-refine-hint">
-                A recording has no schedule of its own — set when this automation should run.
+                A recording has no schedule of its own — set when this automation should run
               </p>
               <ScheduleEditor
                 schedule={plan.trigger.schedule}
@@ -1739,7 +1726,7 @@ function AutomationBuilderView({
             <div className="sb-sec">
               <span className="eyebrow">What the scheduled Skill will do</span>
               <p className="sb-refine-hint">
-                Click any step to edit, or a highlighted value to change it. Reorder, add or remove as needed.
+                Click any step to edit, or a highlighted value to change it. Reorder, add or remove as needed
               </p>
               <AutomationStepTiles
                 steps={plan.steps}
@@ -1760,14 +1747,8 @@ function AutomationBuilderView({
             <p>
               <code className="sb-slug">{builtName}</code>{" "}
               {language === "zh-CN"
-                ? "已生成定时 / 自动触发的 Skill 文件包。"
-                : "is ready as a scheduled or automatically triggered Skill bundle."}
-            </p>
-            {exportedPath && <p className="sb-path">{exportedPath}</p>}
-            <p className="sb-import-hint">
-              {language === "zh-CN"
-                ? "文件包已保存，可在支持定时或触发器的智能体中导入。"
-                : "The bundle is saved and can be imported into an agent that supports schedules or triggers."}
+                ? "已生成，可在支持定时或触发器的智能体中导入"
+                : "is ready to import into agents that support schedules or triggers"}
             </p>
           </div>
         )}
@@ -1798,7 +1779,7 @@ function AutomationBuilderView({
             className="record-cta"
             onClick={() => void window.skillRecorder.revealAutomation(sessionId)}
           >
-            Reveal bundle
+            {language === "zh-CN" ? "查看 Skill 包" : "View Skill package"}
           </button>
         )}
       </BuildFlowFooter>

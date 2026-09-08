@@ -1,7 +1,6 @@
 import {
   BrowserWindow,
   dialog,
-  ipcMain,
   shell,
   type OpenDialogOptions,
   type SaveDialogOptions,
@@ -9,6 +8,7 @@ import {
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { applicationIpc as ipcMain } from "./trusted-ipc";
 
 import type {
   AnalysisEditInput,
@@ -36,7 +36,6 @@ import type { NarrationLanguage } from "../common/narration";
 import type { SensitiveReport } from "../common/sensitive";
 import type { SkillPlan } from "../common/skill";
 import { AutomationBuilder, loadPersistedAutomation } from "./automationbuilder/builder";
-import { openCopilotSignIn } from "./copilot-signin";
 import { buildDebugInfo, writeDebugBundle } from "./debug-bundle";
 import { Describer, loadPersistedAnalysis } from "./describer/describer";
 import type { RedactionContext } from "./describer/tools";
@@ -71,6 +70,7 @@ export function registerIpc(
   screens: ScreenSourceService,
   sensitiveModels: SensitiveModelManager,
   isRecordingStartPending: () => boolean,
+  ensureAgentReady: () => Promise<void>,
 ): void {
   ipcMain.handle(IPC.stop, () => recorder.stop());
   ipcMain.handle(IPC.discard, () => recorder.discard());
@@ -99,6 +99,7 @@ export function registerIpc(
     },
   );
   ipcMain.handle(IPC.screenSettings, () => screens.refresh());
+  ipcMain.handle(IPC.screenPermissions, () => shell.openExternal("x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"));
   ipcMain.handle(
     IPC.screenSource,
     async (_event, sourceId: string): Promise<ScreenSettingsResult> => {
@@ -157,7 +158,6 @@ export function registerIpc(
   ipcMain.handle(IPC.status, () => recorder.status());
   ipcMain.handle(IPC.marker, (_event, note: string) => recorder.marker(note));
   ipcMain.handle(IPC.doctor, () => runDoctor());
-  ipcMain.handle(IPC.copilotSignIn, () => openCopilotSignIn());
   ipcMain.handle(IPC.narrationStatus, () => narration.status());
   ipcMain.handle(IPC.narrationDownload, () => narration.downloadModel());
   ipcMain.handle(IPC.narrationTranscribe, (_event, sessionId: string) =>
@@ -243,6 +243,12 @@ export function registerIpc(
       const id = resolveSessionId(sessionId);
       if (!id) return { ok: false, error: "No completed session to analyze yet." };
       if (!isValidSessionId(id)) return { ok: false, error: "Unknown session." };
+      if (recorder.isProcessing(sessionDir(id))) return { ok: false, error: "This recording is still being processed" };
+      try {
+        await ensureAgentReady();
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+      }
       // Transcribe any recorded voice first so analysis never silently runs without
       // the user's spoken intent. Downloads the model on first use. Best-effort: a
       // failure here falls through to analyzing without voice (the error is surfaced
@@ -270,6 +276,11 @@ export function registerIpc(
     IPC.analyzeFeedback,
     async (_event, input: AnalysisFeedbackInput): Promise<AnalyzeResult> => {
       if (!isValidSessionId(input?.sessionId)) return { ok: false, error: "Unknown session." };
+      try {
+        await ensureAgentReady();
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+      }
       // Re-scan + rebind the redactor so the feedback round stays masked too.
       const { redaction, report } = await buildRedaction(input.sessionId);
       try {
@@ -323,6 +334,9 @@ export function registerIpc(
 
   ipcMain.handle(IPC.deleteSession, async (_event, sessionId: string): Promise<DeleteSessionResult> => {
     if (!isValidSessionId(sessionId)) return { ok: false, error: "Unknown session." };
+    if (recorder.isProcessing(sessionDir(sessionId))) {
+      return { ok: false, error: "This recording is still being processed" };
+    }
     if (recorder.status().sessionId === sessionId) {
       return { ok: false, error: "You can't delete a recording while it's still in progress." };
     }
@@ -396,6 +410,7 @@ export function registerIpc(
   ipcMain.handle(IPC.buildSkill, async (_event, input: SkillBuildInput): Promise<SkillPlanResult> => {
     if (!isValidSessionId(input?.sessionId)) return { ok: false, error: "Unknown session." };
     try {
+      await ensureAgentReady();
       const plan = await builder.build(input);
       return { ok: true, plan };
     } catch (err) {
@@ -415,6 +430,7 @@ export function registerIpc(
     ): Promise<SkillCreateResult> => {
       if (!isValidSessionId(sessionId)) return { ok: false, error: "Unknown session." };
       try {
+        await ensureAgentReady();
         // Generating and exporting are intentionally separate. Export-capable
         // architectures first write a private session copy; the final screen then
         // asks whether the ZIP is for sharing or personal use.
@@ -511,6 +527,7 @@ export function registerIpc(
     async (_event, input: AutomationBuildInput): Promise<AutomationPlanResult> => {
       if (!isValidSessionId(input?.sessionId)) return { ok: false, error: "Unknown session." };
       try {
+        await ensureAgentReady();
         const plan = await automationBuilder.build(input);
         return { ok: true, plan };
       } catch (err) {
@@ -524,6 +541,7 @@ export function registerIpc(
   ipcMain.handle(IPC.createAutomation, async (_event, sessionId: string, plan?: AutomationPlan): Promise<AutomationCreateResult> => {
     if (!isValidSessionId(sessionId)) return { ok: false, error: "Unknown session." };
     try {
+      await ensureAgentReady();
       const { automation, path: file } = await automationBuilder.create(sessionId, plan);
       return { ok: true, automation, path: file };
     } catch (err) {

@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { app, desktopCapturer, screen } from "electron";
+import { app, desktopCapturer, screen, systemPreferences } from "electron";
 
 import type {
   ScreenSettingsResult,
@@ -85,6 +85,7 @@ export class ScreenSourceService {
       await this.loadPreferences();
       await this.refreshSources();
       const source = resolveScreenPreference(this.preference, this.sources).source;
+      if (!source) throw new Error(this.settingsError || "No screens are available to record.");
       return source
         ? {
             screenSourceId: source.id,
@@ -119,6 +120,11 @@ export class ScreenSourceService {
 
   private async refreshSources(emit = true): Promise<void> {
     try {
+      // A settings refresh must not repeatedly trigger a macOS permission prompt.
+      // The user grants access in System Settings; only then enumerate sources.
+      if (process.platform === "darwin" && systemPreferences.getMediaAccessStatus("screen") !== "granted") {
+        throw new Error("Screen recording has not been authorized for this app signature");
+      }
       const sources = await desktopCapturer.getSources({
         types: ["screen"],
         thumbnailSize: { width: 0, height: 0 },
@@ -149,7 +155,11 @@ export class ScreenSourceService {
       }
     } catch (error) {
       this.sources = [];
-      this.settingsError = `Could not list screens: ${errorMessage(error)}`;
+      const permission = process.platform === "darwin" ? systemPreferences.getMediaAccessStatus("screen") : "unknown";
+      log.warn("Screen capture permission:", permission, errorMessage(error));
+      this.settingsError = permission === "denied" || permission === "restricted" || permission === "not-determined"
+        ? "Allow screen recording in System Settings, then quit and reopen the app. If already allowed, remove the old entry and add this app again"
+        : "Could not access screens. Check screen recording permission, then quit and reopen the app";
       log.warn(this.settingsError);
     }
     if (emit) this.emitSettings();

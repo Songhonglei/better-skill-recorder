@@ -56,9 +56,21 @@ export default async function verifyPackagedCompliance(context) {
     }
   }
   await verifyComplianceDirectory(compliance, {
-    requireSources: true,
+    requireSources: "network",
     requireElectronNotices: true,
   });
+
+  const policy = JSON.parse(
+    await readFile(path.join(process.cwd(), "third_party", "compliance-policy.json"), "utf8"),
+  );
+  const bundledEnglishOcr = path.join(resources, "models", "tessdata", "eng.traineddata");
+  const expectedOcrHash = policy.tesseract?.tessdata?.files?.["eng.traineddata"];
+  if (!existsSync(bundledEnglishOcr) || !expectedOcrHash) {
+    throw new Error("Packaged application is missing the reviewed built-in English OCR model.");
+  }
+  if ((await sha256File(bundledEnglishOcr)) !== expectedOcrHash) {
+    throw new Error("Packaged English OCR model differs from the reviewed digest.");
+  }
 
   const asarPath = path.join(resources, "app.asar");
   if (!existsSync(asarPath)) throw new Error(`Packaged application is missing ${asarPath}.`);
@@ -89,6 +101,16 @@ export default async function verifyPackagedCompliance(context) {
     await listUnpackedFiles(path.join(resources, "app.asar.unpacked"))
   ).map((entry) => entry.toLowerCase());
   const allEntries = [...entries, ...unpackedEntries];
+  for (const forbidden of [
+    "node_modules/@github/copilot",
+    "node_modules/koffi/",
+    "node_modules/onnxruntime-web/",
+    "node_modules/onnxruntime-node/bin/napi-v6/linux/",
+    "node_modules/onnxruntime-node/bin/napi-v6/win32/",
+  ]) {
+    const leaked = allEntries.find((entry) => entry.startsWith(forbidden));
+    if (leaked) throw new Error(`Packaged macOS application contains unused payload ${leaked}.`);
+  }
   for (const name of excludedWasmPackages) {
     const prefix = `node_modules/${name.toLowerCase()}/`;
     const leaked = allEntries.find((entry) => entry.startsWith(prefix));

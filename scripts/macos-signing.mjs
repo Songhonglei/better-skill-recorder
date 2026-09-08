@@ -3,6 +3,14 @@ import { spawnSync } from "node:child_process";
 export const LOCAL_MACOS_SIGNING_IDENTITY =
   "Better Skill Recorder Local Development";
 
+export function shouldUseAdHocSignature(env = process.env) {
+  return (
+    env.CI === "true" ||
+    env.CSC_IDENTITY_AUTO_DISCOVERY === "false" ||
+    env.BETTER_SKILL_RECORDER_ALLOW_ADHOC === "1"
+  );
+}
+
 export function parseLocalSigningIdentity(output) {
   const marker = `\"${LOCAL_MACOS_SIGNING_IDENTITY}\"`;
   const line = output

@@ -1,4 +1,3 @@
-import { CopilotAgentRuntime } from "./copilot-runtime";
 import { OpenAICompatibleRuntime } from "./openai-compatible-runtime";
 import type { AgentRuntime } from "./types";
 
@@ -15,15 +14,13 @@ export interface AgentRuntimeFactory {
   create(label: string): AgentRuntime;
 }
 
-export type AgentRuntimeConfiguration =
-  | { readonly provider: "copilot" }
-  | {
-      readonly provider: "openai-compatible";
-      readonly baseUrl: string;
-      readonly apiKey?: string;
-      readonly model: string;
-      readonly supportsVision: boolean;
-    };
+export type AgentRuntimeConfiguration = {
+  readonly provider: "openai-compatible";
+  readonly baseUrl: string;
+  readonly apiKey?: string;
+  readonly model: string;
+  readonly supportsVision: boolean;
+};
 
 function visionEnabled(raw: string | undefined): boolean {
   const value = raw?.trim().toLowerCase();
@@ -43,15 +40,9 @@ export function createAgentRuntimeFactory(
   env: NodeJS.ProcessEnv = process.env,
 ): AgentRuntimeFactory {
   const provider = env[OPENAI_COMPATIBLE_ENV.provider]?.trim();
-  if (!provider || provider === "copilot") {
-    return {
-      provider: "copilot",
-      create: (label) => new CopilotAgentRuntime(label),
-    };
-  }
-  if (provider !== "openai-compatible") {
+  if (provider && provider !== "openai-compatible") {
     throw new Error(
-      `${OPENAI_COMPATIBLE_ENV.provider} must be "copilot" or "openai-compatible".`,
+      `${OPENAI_COMPATIBLE_ENV.provider} must be "openai-compatible".`,
     );
   }
 
@@ -74,12 +65,6 @@ export function createAgentRuntimeFactory(
 export function createAgentRuntimeFactoryFromConfig(
   config: AgentRuntimeConfiguration,
 ): AgentRuntimeFactory {
-  if (config.provider === "copilot") {
-    return {
-      provider: "copilot",
-      create: (label) => new CopilotAgentRuntime(label),
-    };
-  }
   return {
     provider: "openai-compatible",
     create: () => new OpenAICompatibleRuntime(config),

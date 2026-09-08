@@ -1,22 +1,7 @@
-name: Portable builds
+name: macOS unsigned preview
 
-# On-demand, no-install "portable" preview builds.
-#   macOS   -> arm64 .zip        (unzip -> "Skill Recorder.app")
-#   Windows -> x64 portable .exe (single self-contained executable)
-#
-# Runs ONLY when started by hand (workflow_dispatch) -- never on push or pull
-# request -- so ordinary merges don't spend ~10-15 min packaging. The always-on
-# Windows / Non-Windows workflows keep typechecking, testing, and (on Windows)
-# packaging on pull requests and main pushes.
-#
-# Unsigned by design: macOS arm64 carries only the automatic *ad-hoc* signature
-# (mac.identity "-" in package.json) so it launches after a one-time Gatekeeper
-# bypass; Windows is not signed (SmartScreen -> "More info" -> "Run anyway").
-# Enabling real signing later is additive: add the signing secrets; this
-# workflow needs no structural change.
-#
-# Forward-compatible extension point (tracked in #20): add a Windows-arm64 leg
-# with a `windows-11-arm` runner + a `dist:portable:win:arm64` script.
+# On-demand Apple Silicon ZIP. This is intentionally an unsigned/ad-hoc-signed
+# preview until Developer ID signing and Apple notarization are configured.
 
 on:
   workflow_dispatch:
@@ -30,21 +15,9 @@ concurrency:
 
 jobs:
   build:
-    name: Build ${{ matrix.name }}
-    runs-on: ${{ matrix.os }}
+    name: Build macOS ARM64 preview
+    runs-on: macos-15
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-latest # Apple Silicon (arm64)
-            name: macOS-arm64
-            build_script: dist:portable:mac
-            artifact_path: release/*.zip
-          - os: windows-latest # x64
-            name: Windows-x64
-            build_script: dist:portable:win
-            artifact_path: release/*.exe
 
     steps:
       - uses: actions/checkout@v4
@@ -52,31 +25,36 @@ jobs:
         with:
           node-version: 24.19.0
           cache: npm
+      - run: npm install --global npm@11.17.0
+      - run: test "$(node -p process.arch)" = "arm64"
 
       - name: Validate lockfile portability
         run: npm run check:lockfile
 
       - run: npm ci --ignore-scripts=false --dangerously-allow-all-scripts=false --strict-allow-scripts
+      - run: npm test
 
       - name: Package portable app
-        run: npm run ${{ matrix.build_script }}
+        run: npm run dist:portable:mac
         env:
-          # Unsigned preview. macOS arm64 still gets the automatic ad-hoc
-          # signature from mac.identity "-"; this only disables Developer ID
-          # auto-discovery so the runner's empty keychain isn't consulted.
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      - name: Generate checksums
+        run: shasum -a 256 release/*.zip | tee release/SHA256SUMS.txt
 
       - name: Upload portable artifact
         uses: actions/upload-artifact@v4
         with:
-          name: skill-recorder-${{ matrix.name }}
-          path: ${{ matrix.artifact_path }}
+          name: better-skill-recorder-macos-arm64-unsigned-preview
+          path: |
+            release/*.zip
+            release/SHA256SUMS.txt
           if-no-files-found: error
 
       - name: Upload compliance companion
         uses: actions/upload-artifact@v4
         with:
-          name: skill-recorder-${{ matrix.name }}-compliance
+          name: better-skill-recorder-macos-arm64-compliance
           path: .compliance/**
           include-hidden-files: true
           if-no-files-found: error

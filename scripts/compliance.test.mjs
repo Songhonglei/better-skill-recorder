@@ -19,7 +19,6 @@ import {
 } from "./run-reviewed-electron.mjs";
 import {
   assertLockfileClosure,
-  assertReviewedCopilotCliVersions,
   assertReviewedTessdataPins,
   assertWasmExcludedFromPackaging,
   buildArtisticSourceSpecs,
@@ -209,7 +208,7 @@ test("Artistic-2.0 packages retain exact Standard Version source", () => {
   );
 });
 
-test("every reviewed source hash is referenced by the release manifest", () => {
+test("every macOS release source has a reviewed hash", () => {
   const darwinVersions = {
     ...nativeVersions,
     archive: "3.8.8",
@@ -222,14 +221,13 @@ test("every reviewed source hash is referenced by the release manifest", () => {
     tiff: "d01a94b",
     uhdr: "1acdbed",
   };
-  const expected = [
-    ...buildComplianceSourceSpecs(nativeVersions, repoLock, repoPolicy, "win32"),
-    ...buildComplianceSourceSpecs(darwinVersions, repoLock, repoPolicy, "darwin"),
-  ].map(({ id }) => id);
-  assert.deepEqual(
-    new Set(Object.keys(repoPolicy.sourceMaterials)),
-    new Set(expected),
-  );
+  const expected = buildComplianceSourceSpecs(
+    darwinVersions,
+    repoLock,
+    repoPolicy,
+    "darwin",
+  ).map(({ id }) => id);
+  for (const id of expected) assert.match(repoPolicy.sourceMaterials[id], /^[a-f0-9]{64}$/);
 });
 
 test("native source manifest covers dependencies, build scripts, and patches", () => {
@@ -401,25 +399,6 @@ test("unreviewed ONNX versions fail closed", () => {
   );
 });
 
-test("unreviewed GitHub Copilot CLI versions fail closed", () => {
-  const reviewedLock = {
-    packages: {
-      "node_modules/@github/copilot": { version: "1.0.71" },
-      "node_modules/@github/copilot-win32-x64": { version: "1.0.71" },
-    },
-  };
-  assert.doesNotThrow(() =>
-    assertReviewedCopilotCliVersions(reviewedLock, "1.0.71"),
-  );
-
-  const changedLock = structuredClone(reviewedLock);
-  changedLock.packages["node_modules/@github/copilot-win32-x64"].version = "1.0.72";
-  assert.throws(
-    () => assertReviewedCopilotCliVersions(changedLock, "1.0.71"),
-    /have not been reviewed/,
-  );
-});
-
 test("platform Sharp/libvips packages use the reviewed LGPL text", () => {
   const pkg = {
     name: "@img/sharp-libvips-linux-x64",
@@ -580,21 +559,17 @@ test("exactly one architecture-matched native payload is packaged", async () => 
     "win32-arm64",
     "win32-x64",
   ]);
-  assert.deepEqual(releaseTargets, ["win32-x64", "win32-arm64", "darwin-arm64"]);
+  assert.deepEqual(releaseTargets, ["darwin-arm64"]);
 });
 
-test("the lockfile resolves every dependency npm ci needs on other platforms", async () => {
+test("the lockfile resolves every hard dependency needed by the macOS build", async () => {
   const lock = JSON.parse(await readFile(path.join(repoRoot, "package-lock.json"), "utf8"));
   assert.doesNotThrow(() => assertLockfileClosure(lock));
 
-  // npm on Windows drops entries that only Linux and macOS install, which breaks the
-  // documented `npm ci` source-install path.
+  // Optional WASM dependencies are deliberately excluded from this macOS artifact.
   const pruned = structuredClone(lock);
   delete pruned.packages["node_modules/@emnapi/runtime"];
-  assert.throws(
-    () => assertLockfileClosure(pruned),
-    /@img\/sharp-wasm32 -> @emnapi\/runtime/,
-  );
+  assert.doesNotThrow(() => assertLockfileClosure(pruned));
 
   assert.doesNotThrow(() =>
     assertLockfileClosure({
@@ -618,11 +593,6 @@ test("Electron notices are reviewed per release target", async () => {
   );
   // Chromium's notice file differs per platform, so a single reviewed hash would either
   // fail macOS or wave through an unreviewed Windows notice.
-  assert.deepEqual(Object.keys(policy.electron.notices).sort(), [...releaseTargets].sort());
-  const chromium = new Set(
-    releaseTargets.map((target) => policy.electron.notices[target]["LICENSES.chromium.html"]),
-  );
-  assert.equal(chromium.size, 2, "Windows and macOS ship different Chromium notices");
   for (const target of releaseTargets) {
     assert.ok(policy.electron.distributions[target], `${target} needs a reviewed distribution`);
     for (const notice of ["LICENSE.electron.txt", "LICENSES.chromium.html"]) {
@@ -639,9 +609,9 @@ test("the WASM payload is excluded from every Electron artifact", () => {
     "@emnapi/runtime",
   ]);
   assert.doesNotThrow(() => assertWasmExcludedFromPackaging(repoManifest.build));
-  for (const list of ["files", "win"]) {
+  for (const list of ["files"]) {
     const build = structuredClone(repoManifest.build);
-    const target = list === "files" ? build.files : build.win.files;
+    const target = build.files;
     target.splice(target.indexOf("!node_modules/@img/sharp-wasm32/**"), 1);
     assert.throws(
       () => assertWasmExcludedFromPackaging(build),
@@ -652,8 +622,8 @@ test("the WASM payload is excluded from every Electron artifact", () => {
 
 test("only supported release targets are packaged", () => {
   assert.equal(repoManifest.build.linux, undefined, "Linux is not a release target");
+  assert.equal(repoManifest.build.win, undefined, "Windows is not a release target");
   assert.deepEqual(repoManifest.build.mac.target, ["dmg", "zip"]);
-  assert.equal(repoManifest.build.win.target, "nsis");
 });
 
 test("macOS packages declare desktop capture privacy usage", () => {
@@ -881,7 +851,7 @@ test("licenses-only bundles cannot pass release verification", async () => {
         requireSources: true,
         requireRemoteMaterials: false,
       }),
-      /requires full corresponding sources/,
+      /requires (?:full|embedded) corresponding sources/,
     );
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -889,185 +859,43 @@ test("licenses-only bundles cannot pass release verification", async () => {
 });
 
 test("source and release instructions remain compliance-preserving", async () => {
-  const [
-    windowsInstaller,
-    unixInstaller,
-    instructions,
-    readme,
-    releasing,
-    windowsWorkflow,
-    electronInstaller,
-  ] = await Promise.all([
-    readFile(path.join(repoRoot, "install.ps1"), "utf8"),
-    readFile(path.join(repoRoot, "install.sh"), "utf8"),
+  const [instructions, readme, releasing, checksWorkflow, previewWorkflow] = await Promise.all([
     readFile(path.join(repoRoot, "INSTALL.md"), "utf8"),
     readFile(path.join(repoRoot, "README.md"), "utf8"),
     readFile(path.join(repoRoot, "RELEASING.md"), "utf8"),
     readFile(
-      path.join(repoRoot, ".github", "workflows", "windows.yml"),
+      path.join(repoRoot, ".github", "workflows", "non-windows.yml"),
       "utf8",
     ),
     readFile(
-      path.join(repoRoot, "scripts", "install-reviewed-electron.mjs"),
+      path.join(repoRoot, ".github", "workflows", "portable.yml"),
       "utf8",
     ),
   ]);
 
-  assert.match(windowsInstaller, /\^\[0-9a-fA-F\]\{40\}\$/);
-  assert.match(
-    windowsInstaller,
-    /https:\/\/codeload\.github\.com\/Songhonglei\/better-skill-recorder\/zip\/\$Commit/,
-  );
-  assert.match(windowsInstaller, /https:\/\/nodejs\.org\/dist\/index\.json/);
-  assert.doesNotMatch(
-    windowsInstaller,
-    /NPM_CONFIG_(?:REGISTRY|REPLACE_REGISTRY_HOST)/,
-  );
-  assert.match(
-    windowsInstaller,
-    /https:\/\/github\.com\/electron\/electron\/releases\/download\//,
-  );
-  assert.match(windowsInstaller, /SHASUMS256\.txt/);
-  assert.match(windowsInstaller, /Get-AuthenticodeSignature/);
-  assert.match(windowsInstaller, /OpenJS Foundation/);
-  assert.match(windowsInstaller, /GitHub, Inc\\\./);
-  assert.match(windowsInstaller, /@github\\copilot\\LICENSE\.md/);
-  assert.match(windowsInstaller, /@github\\copilot-win32-\$architecture/);
-  assert.match(windowsInstaller, /node_modules\\electron\\dist\\LICENSES\.chromium\.html/);
-  assert.match(windowsInstaller, /third_party\\compliance-policy\.json/);
-  assert.match(windowsInstaller, /Assert-ReviewedElectronDistribution/);
-  assert.match(windowsInstaller, /EnvironmentVariableTarget\]::Machine/);
-  assert.doesNotMatch(
-    windowsInstaller,
-    /RuntimeInformation\]::OSArchitecture/,
-  );
-  assert.match(
-    windowsInstaller,
-    /\$compatibleReleases = @\(\s+foreach \(\$release in \$index\)/,
-  );
-  assert.doesNotMatch(
-    windowsInstaller,
-    /\$index = @\(Get-Content [^\r\n]+ConvertFrom-Json\)/,
-  );
-  assert.match(windowsInstaller, /\$versionOutput = @\(& \$nodeExe --version\)/);
-  assert.doesNotMatch(
-    windowsInstaller,
-    /\(& \$nodeExe [^\r\n]+\| Select-Object -First 1\)/,
-  );
-  assert.match(
-    windowsInstaller,
-    /"ci",\s+"--no-audit",\s+"--no-fund",\s+"--ignore-scripts=false",\s+"--dangerously-allow-all-scripts=false",\s+"--strict-allow-scripts"/,
-  );
-  assert.match(windowsInstaller, /"scripts\\check-lockfile-portability\.mjs"/);
-  assert.match(windowsInstaller, /"scripts\\install-reviewed-electron\.mjs"/);
-  assert.doesNotMatch(windowsInstaller, /node_modules\\electron\\install\.js/);
-  assert.match(
-    windowsInstaller,
-    /Move-DirectoryTree -Source \$buildDirectory -Destination \$sourceDirectory/,
-  );
-  assert.match(
-    windowsInstaller,
-    /Move-DirectoryTree -Source \$expandedDirectory -Destination \$runtimeDirectory/,
-  );
-  assert.match(windowsInstaller, /@?\("run", "compliance:licenses"\)/);
-  assert.match(windowsInstaller, /@?\("run", "build"\)/);
-  assert.doesNotMatch(
-    windowsInstaller,
-    /github\.com\/microsoft\/skill-recorder\/releases\/download/i,
-  );
-  assert.doesNotMatch(windowsInstaller, /\/(?:master|main)\/install\.ps1/i);
-
-  assert.match(windowsInstaller, /"Better Skill Recorder\.lnk"/);
-  assert.match(windowsInstaller, /SpecialFolder "Programs"/);
-  assert.match(windowsInstaller, /SpecialFolder "DesktopDirectory"/);
-  assert.match(windowsInstaller, /SKILL_RECORDER_NO_DESKTOP_SHORTCUT -ne "1"/);
-  assert.match(
-    windowsInstaller,
-    /Get-CachedDownload `\r?\n\s+-Uri "\$baseUri\/\$archiveName" `\r?\n\s+-CachePath \$archivePath `\r?\n\s+-ExpectedSha256 \$expectedHash/,
-  );
-  assert.match(windowsInstaller, /Remove-CachedDownload -CachePath \$archivePath/);
-  assert.match(windowsInstaller, /Remove-CachedDownload -CachePath \$sourceArchive/);
-
-  assert.match(unixInstaller, /\^\[0-9a-fA-F\]\{40\}\$/);
-  assert.match(
-    unixInstaller,
-    /https:\/\/codeload\.github\.com\/Songhonglei\/better-skill-recorder\/tar\.gz\/\$COMMIT/,
-  );
-  assert.match(unixInstaller, /https:\/\/nodejs\.org\/dist\/latest-v24\.x/);
-  assert.doesNotMatch(
-    unixInstaller,
-    /NPM_CONFIG_(?:REGISTRY|REPLACE_REGISTRY_HOST)/,
-  );
-  assert.match(
-    unixInstaller,
-    /https:\/\/github\.com\/electron\/electron\/releases\/download\//,
-  );
-  assert.match(unixInstaller, /SHASUMS256\.txt/);
-  assert.match(
-    unixInstaller,
-    /"\$NPM" ci \\\s+--no-audit \\\s+--no-fund \\\s+--ignore-scripts=false \\\s+--dangerously-allow-all-scripts=false \\\s+--strict-allow-scripts/,
-  );
-  assert.match(
-    unixInstaller,
-    /"\$NODE" "scripts\/check-lockfile-portability\.mjs"/,
-  );
-  assert.match(
-    unixInstaller,
-    /"\$NODE" "scripts\/install-reviewed-electron\.mjs"/,
-  );
-  assert.doesNotMatch(unixInstaller, /node_modules\/electron\/install\.js/);
-  assert.match(unixInstaller, /"\$NPM" run compliance:licenses/);
-  assert.match(unixInstaller, /"\$NPM" run build/);
-  assert.match(unixInstaller, /\.compliance\/licenses\/LGPL-3\.0\.txt/);
-  assert.match(unixInstaller, /@github\/copilot-\$\{PLATFORM\}-\$\{ARCHITECTURE\}/);
-  assert.doesNotMatch(
-    unixInstaller,
-    /github\.com\/microsoft\/skill-recorder\/releases\/download/i,
-  );
-  assert.doesNotMatch(unixInstaller, /\/(?:master|main)\/install\.sh/i);
-
-  assert.match(instructions, /generated build is for local execution only/i);
+  assert.match(instructions, /unsigned preview warning/i);
+  assert.match(instructions, /Apple Silicon Macs only/i);
+  assert.match(instructions, /SHA-256/i);
+  assert.match(instructions, /Privacy & Security/i);
+  assert.match(instructions, /Open Anyway/i);
+  assert.match(instructions, /Do not disable Gatekeeper globally/i);
   assert.match(instructions, /npm ci/);
-  assert.match(instructions, /full 40-character commit SHA/i);
-  assert.match(instructions, /npm 11\.17/i);
-  assert.match(instructions, /macOS/);
-  assert.match(instructions, /Ubuntu/);
-  assert.match(instructions, /complete generated\s+compliance bundle/i);
-  assert.doesNotMatch(instructions, /raw\.githubusercontent\.com\/[^ \n]+\/(?:master|main)\//i);
-  assert.match(electronInstaller, /createHash\("sha256"\)/);
-  assert.match(electronInstaller, /@electron-internal\/extract-zip/);
-  assert.match(electronInstaller, /@electron\/get/);
-  assert.match(electronInstaller, /checksums,/);
-  assert.match(electronInstaller, /initializeProxy\(\)/);
-  assert.match(
-    electronInstaller,
-    /https:\/\/github\.com\/electron\/electron\/releases\/download\//,
-  );
-  assert.equal(
-    repoManifest.scripts.dev,
-    "node scripts/run-reviewed-electron.mjs dev",
-  );
-  assert.equal(
-    repoManifest.scripts.start,
-    "node scripts/run-reviewed-electron.mjs start",
-  );
-  assert.match(instructions, /SKILL_RECORDER_NO_DESKTOP_SHORTCUT=1/);
-  assert.match(instructions, /GetFolderPath\('DesktopDirectory'\)/);
-  assert.match(readme, /\[`INSTALL\.md`\]\(INSTALL\.md\)/);
-  assert.match(readme, /\[`RELEASING\.md`\]\(RELEASING\.md\)/);
-  assert.doesNotMatch(readme, /raw\.githubusercontent\.com\/[^ \n]+\/(?:master|main)\//i);
-  assert.match(releasing, /source-only releases.*are the default/i);
-  assert.match(releasing, /npm version 0\.2\.0 --no-git-tag-version/);
-  assert.match(releasing, /full release commit SHA/i);
-  assert.match(releasing, /git",\["cat-file","blob"/);
-  assert.match(releasing, /not working-tree\s+files/i);
-  assert.match(releasing, /SHA-256 values for `install\.ps1` and `install\.sh`/i);
-  assert.match(releasing, /complete, version-matched\s+compliance bundle/i);
-  assert.match(releasing, /Tesseract\.js-core/);
-  assert.match(instructions, /Tesseract WebAssembly component notices/);
-  assert.match(releasing, /Never silently replace an asset or move a release tag/i);
-  assert.match(
-    windowsWorkflow,
-    /- name: Test commit-pinned source installation\r?\n\s+shell: powershell/,
-  );
+  assert.match(instructions, /npm `>=11\.17\.0`/i);
+  assert.match(instructions, /assets:prepare/);
+  assert.match(readme, /macOS on Apple Silicon \(ARM64\)/i);
+  assert.match(readme, /ad-hoc signed and not notarized by Apple/i);
+  assert.match(readme, /share-safe Skills without secrets/i);
+  assert.doesNotMatch(readme, /bundled GitHub Copilot/i);
+  assert.match(releasing, /macOS Apple Silicon unsigned preview/i);
+  assert.match(releasing, /CSC_IDENTITY_AUTO_DISCOVERY=false npm run dist:portable:mac/);
+  assert.match(releasing, /SHA256SUMS\.txt/);
+  assert.match(releasing, /Hardened Runtime/);
+  assert.match(releasing, /Never silently replace an asset or move a published tag/i);
+  assert.match(checksWorkflow, /runs-on: macos-15/);
+  assert.match(checksWorkflow, /npm@11\.17\.0/);
+  assert.match(checksWorkflow, /npm run compliance:prepare/);
+  assert.match(previewWorkflow, /CSC_IDENTITY_AUTO_DISCOVERY: "false"/);
+  assert.match(previewWorkflow, /npm run dist:portable:mac/);
+  assert.match(previewWorkflow, /shasum -a 256 release\/\*\.zip/);
+  assert.doesNotMatch(previewWorkflow, /windows-latest/i);
 });

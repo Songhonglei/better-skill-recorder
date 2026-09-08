@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import type {
-  DoctorReport,
   MicrophoneSettingsStatus,
   NarrationStatus,
   RecorderStatus,
@@ -22,8 +21,8 @@ import { RecordingPrivacyWarning } from "./RecordingPrivacyWarning";
 import { WhatsRecorded } from "./WhatsRecorded";
 
 const IS_MAC = typeof navigator !== "undefined" && /Mac/i.test(navigator.userAgent);
-/** Mirrors the main-process global shortcut "CommandOrControl+Shift+R", per OS. */
-const TOGGLE_SHORTCUT = IS_MAC ? "⌘⇧R" : "Ctrl+Shift+R";
+/** Mirrors the main-process global shortcut "Alt+Shift+R", per OS. */
+const TOGGLE_SHORTCUT = IS_MAC ? "⌥⇧R" : "Alt+Shift+R";
 type PrivacyReviewOrigin = "home" | "warning";
 type NarrationLanguageMode = "auto" | "manual";
 
@@ -71,7 +70,32 @@ function measureHudHeight(hud: HTMLElement): number {
 export function Recorder() {
   const { language } = useLanguage();
   const [status, setStatus] = useState<RecorderStatus | null>(null);
-  const [doctor, setDoctor] = useState<DoctorReport | null>(null);
+  const [shortcutReady, setShortcutReady] = useState(true);
+  const [recordingShortcut, setRecordingShortcut] = useState(TOGGLE_SHORTCUT);
+  useEffect(() => {
+    const refresh = () => {
+      void window.skillRecorder.appSettings().then(settings => setRecordingShortcut(IS_MAC ? settings.recordingShortcut.replace("Command", "⌘").replace("Control", "⌃").replace("Alt", "⌥").replace("Shift", "⇧").replaceAll("+", "") : settings.recordingShortcut));
+      void window.skillRecorder.shortcutStatus().then(setShortcutReady);
+    };
+    refresh();
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
+  }, []);
+  const [screenChecking, setScreenChecking] = useState(false);
+  const [screenCheckMessage, setScreenCheckMessage] = useState("");
+  async function checkScreens() {
+    if (screenChecking) return;
+    setScreenChecking(true);
+    setScreenCheckMessage("");
+    try {
+      const next = await window.skillRecorder.screenSettings();
+      setScreenSettings(next);
+      setScreenActionError(null);
+      setScreenCheckMessage(next.error ? "Screen access is still unavailable — allow it in System Settings and restart the app" : "Screen detection complete");
+    } catch {
+      setScreenCheckMessage("Screen detection failed — restart the app and try again");
+    } finally { setScreenChecking(false); }
+  }
   const [narrationStatus, setNarrationStatus] = useState<NarrationStatus | null>(null);
   const [microphoneSettings, setMicrophoneSettings] =
     useState<MicrophoneSettingsStatus | null>(null);
@@ -79,6 +103,7 @@ export function Recorder() {
     useState<ScreenSettingsStatus | null>(null);
   const [privacyReviewOrigin, setPrivacyReviewOrigin] =
     useState<PrivacyReviewOrigin | null>(null);
+  const [showProtection, setShowProtection] = useState(false);
   const [showRecordingWarning, setShowRecordingWarning] = useState(false);
   const [warningStarting, setWarningStarting] = useState(false);
   const [showNarrationSettings, setShowNarrationSettings] = useState(false);
@@ -114,7 +139,7 @@ export function Recorder() {
 
   useEffect(() => {
     void window.skillRecorder.status().then(applyRecorderStatus);
-    void window.skillRecorder.doctor().then(setDoctor);
+    void window.skillRecorder.shortcutStatus().then(setShortcutReady).catch(() => setShortcutReady(false));
     void window.skillRecorder.narrationStatus().then(setNarrationStatus);
     void window.skillRecorder.microphoneSettings().then(setMicrophoneSettings);
     void window.skillRecorder.screenSettings().then(setScreenSettings);
@@ -544,6 +569,7 @@ export function Recorder() {
               onClick={() => setShowNarrationSettings(false)}
             />
             <div id="recording-settings" className="narrate-settings">
+            {narrationStatus && narrationStatus.model !== "ready" && <VoiceModelRow status={narrationStatus} recording={recording} onDownload={downloadNarrationModel} />}
             <label htmlFor="narrate-language">Language</label>
             <div className="narrate-select-wrap">
               <select
@@ -671,48 +697,32 @@ export function Recorder() {
                   screenSettings?.fallback}
               </p>
             )}
+            {(screenSettings?.error || screenChecking || screenCheckMessage) && <div className="screen-recovery-actions">
+              <button type="button" onClick={() => void window.skillRecorder.screenPermissions().catch(() => setScreenCheckMessage("Open System Settings manually to allow screen recording"))}>
+                <svg viewBox="0 0 20 20" fill="none" aria-hidden><rect x="2" y="3" width="16" height="11" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M7 17h6m-3-3v3" stroke="currentColor" strokeWidth="1.5"/></svg>
+                Screen permission
+              </button>
+              <button type="button" disabled={screenChecking} aria-busy={screenChecking} onClick={() => void checkScreens()}>
+                <svg viewBox="0 0 20 20" fill="none" aria-hidden><path d="M16 8a6 6 0 1 0 0 5M16 3v5h-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                {screenChecking ? "Checking screens…" : "Refresh screens"}
+              </button>
+            </div>}
+            {screenCheckMessage && <p className="screen-recovery-feedback" role="status">{screenCheckMessage}</p>}
             </div>
           </>
         )}
       </section>
 
-      <button className="privacy-note" onClick={() => openPrivacyReview("home")}>
-        <span className="privacy-note-icon" aria-hidden>
-          <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-            <path
-              d="M10 2.5 4 4.8v4.3c0 3.4 2.4 6.2 6 7.4 3.6-1.2 6-4 6-7.4V4.8L10 2.5Z"
-              stroke="currentColor"
-              strokeWidth="1.4"
-              strokeLinejoin="round"
-            />
-            <path
-              d="m7.4 9.8 1.9 1.9 3.4-3.6"
-              stroke="currentColor"
-              strokeWidth="1.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </span>
-        <span className="privacy-note-text">
-          <span className="privacy-note-title">Records your screen and activity</span>
-          <span className="privacy-note-sub">See exactly what's captured</span>
-        </span>
-        {!advancedOn ? (
-          <span className="privacy-note-badge is-off">Protection off</span>
-        ) : null}
-        <span className="privacy-note-chevron" aria-hidden>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path
-              d="M6 4l4 4-4 4"
-              stroke="currentColor"
-              strokeWidth="1.7"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </span>
-      </button>
+      <section className={`narrate protection-control ${advancedOn ? "on" : ""}`}>
+        <span className="narrate-icon" aria-hidden><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2.5 4 4.8v4.3c0 3.4 2.4 6.2 6 7.4 3.6-1.2 6-4 6-7.4V4.8L10 2.5Z" stroke="currentColor" strokeWidth="1.4"/><path d="m7 10 2 2 4-4" stroke="currentColor" strokeWidth="1.4"/></svg></span>
+        <div className="narrate-text">
+          <div className="protection-title"><span className="narrate-label">Privacy and security protection</span><button type="button" className="protection-info" aria-label="About privacy and security protection" onClick={() => setShowProtection(true)}>ⓘ</button></div>
+          <span className="narrate-sub">{advancedOn ? "Hide sensitive details before analysis" : "Protection off"}</span>
+        </div>
+        <button type="button" className="narrate-switch-btn" role="switch" aria-label="Privacy and security protection" aria-checked={advancedOn} aria-busy={advancedPending} disabled={!sensitive || advancedPending || recording || transitioning} onClick={() => void toggleAdvanced()}>
+          <span className={`narrate-switch ${advancedOn ? "on" : ""}`} aria-hidden><span className="narrate-knob" /></span>
+        </button>
+      </section>
 
       <button
         className={`sessions-open ${pendingCount > 0 ? "has-new" : ""}`}
@@ -775,31 +785,14 @@ export function Recorder() {
         </span>
       </button>
 
-      {doctor && (
-        <div className="doctor">
-          <Row
-            label="GitHub Copilot"
-            status={doctor.copilotCli.ok ? "good" : "bad"}
-            note={doctor.copilotCli.ok ? "found" : "missing"}
-          />
-          {narrate && narrationStatus && (
-            <VoiceModelRow
-              status={narrationStatus}
-              recording={recording}
-              onDownload={downloadNarrationModel}
-            />
-          )}
-          {sensitive && (
-            <SensitiveModelRow
-              status={sensitive}
-              recording={recording}
-              onDownload={downloadSensitiveModels}
-            />
-          )}
-        </div>
-      )}
-
-      <p className="hint">{TOGGLE_SHORTCUT} toggles from anywhere</p>
+      <div className="recorder-footer">
+        {shortcutReady ? <p className="hint">{recordingShortcut} starts recording from anywhere</p> : <>
+          <p className="hint" role="status">Shortcut unavailable — use the record button or release the shortcut in another app</p>
+          <button className="recording-help" type="button" onClick={() => void window.skillRecorder.shortcutRetry().then(setShortcutReady)}>Retry shortcut</button>
+        </>}
+        <button type="button" className="recording-help" onClick={() => openPrivacyReview("home")}>Recording guide</button>
+      </div>
+      {showProtection && <WhatsRecorded mode="protection" onClose={() => setShowProtection(false)} onReviewed={() => setShowProtection(false)} sensitive={sensitive} onDownload={downloadSensitiveModels} />}
 
       {showRecordingWarning && (
         <RecordingPrivacyWarning
@@ -814,8 +807,6 @@ export function Recorder() {
           onClose={closePrivacyReview}
           onReviewed={() => void completePrivacyReview()}
           sensitive={sensitive}
-          advancedPending={advancedPending}
-          onToggleAdvanced={() => void toggleAdvanced()}
           onDownload={downloadSensitiveModels}
         />
       )}
@@ -884,37 +875,6 @@ function VoiceModelRow({
         disabled: recording,
         onClick: onDownload,
       }}
-    />
-  );
-}
-
-/** Single doctor row for the opt-out Advanced-protection model, shown while enabled.
- *  Goes red whenever the on-device screen-text model isn't downloaded, with one
- *  action that fetches it. */
-function SensitiveModelRow({
-  status,
-  recording,
-  onDownload,
-}: {
-  status: SensitiveModelStatus;
-  recording: boolean;
-  onDownload: () => void;
-}) {
-  if (!status.enabled) return null;
-  if (status.ocr === "downloading") {
-    const note = status.progress == null ? "downloading" : `${Math.round(status.progress)}%`;
-    return <Row label="advanced protection" status="warn" note={note} />;
-  }
-  if (status.ocr === "ready") {
-    return <Row label="advanced protection" status="good" note="on-device" />;
-  }
-  const failed = status.ocr === "error";
-  return (
-    <Row
-      label="advanced protection"
-      status="bad"
-      note={failed ? "download failed" : "not downloaded"}
-      action={{ label: failed ? "retry" : "download", disabled: recording, onClick: onDownload }}
     />
   );
 }

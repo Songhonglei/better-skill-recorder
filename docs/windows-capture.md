@@ -1,5 +1,8 @@
 # Windows event capture
 
+> **Archived upstream design.** Windows capture is not supported or packaged by the current
+> Better Skill Recorder release. Do not use this document as installation guidance.
+
 Skill Recorder is cross platform (macOS + Windows). The core (recorder controller,
 event bus, session store, collector host, capture tiers, describer, skill builder)
 is platform agnostic. This doc covers the parts that are OS specific: how each

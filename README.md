@@ -1,222 +1,158 @@
 # Better Skill Recorder
 
-**Record yourself doing a task once, then turn it into a skill your AI agent can repeat—with the model provider you choose.**
+**Preview V0.1.0 · Apple Silicon · Unsigned Preview**
 
-Better Skill Recorder captures a real work session on your screen: the clicks, the app and
-window switches, the pages you visit, and (if you want) your spoken narration. It then uses
-**GitHub Copilot or your configured OpenAI-compatible model** to reconstruct *what you
-actually did* as a clear **intent plus an ordered list of steps**. From there, one step
-turns that single run into something an agent can reuse:
+[项目主页 / Website](https://songhonglei.github.io/better-skill-recorder/) ·
+[下载预览版 / Download](https://github.com/Songhonglei/better-skill-recorder/releases/tag/v0.1.0-preview.1) ·
+[中文安装与使用说明](docs/GETTING_STARTED.zh-CN.md) ·
+[高级设置](docs/ADVANCED_SETTINGS.md)
 
-- a **Skill**: a `SKILL.md` procedure an agent runs on demand, or
-- an **Automation**: the same procedure on a schedule or trigger.
+No Node.js, npm, or GitHub Copilot installation is required for packaged-app users.
+Bring your own compatible model endpoint and API key. This preview has not yet completed
+an independent clean-Mac acceptance test; begin with non-sensitive sample recordings.
 
-Both prefer the agent's **native tools** (like the `gh` CLI or `web_fetch`) over replaying
-UI clicks, and generalize from your one example, so recording yourself submitting *one*
-form can teach the agent to submit *all* of them.
+Record a task once and turn it into an on-demand Skill or an automated workflow that an
+AI agent can reuse.
+
+Better Skill Recorder captures screen activity, app and window changes, browser context,
+clipboard previews, and optional narration. A user-selected OpenAI-compatible model then
+reconstructs the intent and ordered steps. You can review the result before exporting it
+as a share-safe Skill or a personal Skill containing local configuration.
+
+> Current platform: **macOS on Apple Silicon (ARM64)**. Windows, Linux, and Intel Mac
+> packages are not part of the current release.
 
 <p align="center">
-  <img src="docs/images/recorder.png" alt="Better Skill Recorder capture window in Chinese: a record button, timer, narration language following the interface, microphone and screen settings, and readiness checks" width="420">
+  <img src="docs/images/recorder.png" alt="Better Skill Recorder capture window" width="420">
   &nbsp;&nbsp;
-  <img src="docs/images/library.png" alt="Skill Recorder sessions view: recorded sessions on the left, the reconstructed intent and ordered steps on the right" width="520">
+  <img src="docs/images/library.png" alt="Better Skill Recorder sessions window" width="520">
 </p>
 
-### Bring your own model
+## Highlights
 
-The **Model control** page switches every AI workflow between the bundled GitHub Copilot
-runtime and an OpenAI-compatible endpoint. Base URL, exact model ID, visual analysis, and
-globally configurable model presets are all visible before activation; API keys are stored
-separately with operating-system encryption.
-
-<p align="center">
-  <img src="docs/images/model-control.jpg" alt="Better Skill Recorder model control page showing GitHub Copilot and OpenAI-compatible provider routing" width="760">
-</p>
-
-The included preset list is data-driven rather than hard-coded into the UI. See
-[`docs/MODEL_CONFIGURATION.md`](docs/MODEL_CONFIGURATION.md) for configuration and
-[`docs/OPENAI_COMPATIBLE_VALIDATION.md`](docs/OPENAI_COMPATIBLE_VALIDATION.md) for the
-compatibility matrix and validation boundaries.
+- Record a real workflow instead of writing a procedure from scratch
+- Analyze with your own OpenAI-compatible endpoint and API key
+- Configure verified presets or any compatible model ID
+- Keep API keys encrypted by the macOS credential store
+- Run English OCR locally before visual data is sent to the selected model
+- Export share-safe Skills without secrets or machine-specific configuration
+- Export personal Skills that retain local defaults when explicitly requested
+- Generate Skills without coupling them to OpenClaw, Codex, Claude Code, or another host
 
 ## How it works
 
-1. 🔴 **Record.** Hit record (or `⌘⇧R` / `Ctrl+Shift+R` from anywhere) and just do your
-   task. Better Skill Recorder captures your screen and activity locally, in the background.
-2. 🎛️ **Control.** While recording, a small always-on-top bar shows capture and
-   microphone state. Mute, unmute, or switch mics on the fly, then finish, or discard
-   (with a confirmation) if the take didn't go to plan.
-3. 🧠 **Analyze.** Click Analyze and GitHub Copilot—or your configured
-   OpenAI-compatible model—reconstructs one overall intent and an ordered list of
-   steps. Review and edit until it reads right.
-4. ✨ **Create.** From an approved analysis, generate a reusable **Skill** and/or a
-   scheduled **Automation**.
+1. **Record** — start a recording and complete the task normally
+2. **Analyze** — review the locally collected timeline and send selected, redacted material
+   to your configured model
+3. **Edit** — correct the intent and ordered steps
+4. **Export** — create a share-safe or personal Skill package
 
-Use the compact **EN / 中文** control in the recorder or Sessions window to switch the
-entire interface. The choice is stored on this computer and synchronized across the app's
-windows. Narration follows the interface language by default, while an explicit narration
-language remains available for multilingual workflows. Generated analysis and
-Skill/Automation content stays in its original language.
+Recording and local redaction do not contact a model. Network requests begin only when
+you analyze, generate, test a model connection, or download the optional narration model.
+Turning off visual analysis prevents screenshots from being sent to the model.
 
-## Get started
+## Install the unsigned preview
 
-Better Skill Recorder is published as a **source release**: one command downloads a pinned Node.js
-runtime, builds the exact release commit on your machine, and adds a **Better Skill Recorder**
-app you can relaunch anytime. Nothing is installed globally. Use either a GitHub account with
-**Copilot access** (the Copilot CLI ships with the app) or credentials for a compatible endpoint.
+GitHub preview binaries are currently **ad-hoc signed and not notarized by Apple**. macOS
+will warn that it cannot verify the developer or check the app through Apple's notarization
+service. Install only a release downloaded from this repository and verify its SHA-256
+checksum first.
 
-macOS is the primary target. Windows 11 (x64 and ARM64) is supported too (see
-[`WINDOWS-VALIDATION.md`](WINDOWS-VALIDATION.md)).
+1. Download the `macOS-arm64` ZIP and `SHA256SUMS.txt` from the
+   [Preview V0.1.0 release](https://github.com/Songhonglei/better-skill-recorder/releases/tag/v0.1.0-preview.1)
+2. Verify the download:
 
-### Install it
+   ```bash
+   shasum -a 256 "/path/to/Better-Skill-Recorder-0.1.0-preview.1-macOS-arm64-unsigned-preview.zip"
+   ```
 
-Open the **[latest release](https://github.com/Songhonglei/better-skill-recorder/releases/latest)** and
-copy the command for your platform. Each release pins an exact commit, so the real command looks
-like the patterns below with `<40-character-release-commit>` filled in.
+3. Confirm the output matches the value published in `SHA256SUMS.txt`
+4. Unzip the archive and move **Better Skill Recorder.app** to `/Applications`
+5. Try to open the app once
+6. If macOS blocks it, open **System Settings → Privacy & Security**, scroll to
+   **Security**, choose **Open Anyway**, then confirm **Open**
 
-**macOS / Ubuntu**
+Do not disable Gatekeeper globally and do not run unverified `xattr` commands copied from
+third-party sites. See [INSTALL.md](INSTALL.md) for permissions, updates, and uninstall.
 
-```bash
-commit="<40-character-release-commit>"; curl -fsSL "https://raw.githubusercontent.com/Songhonglei/better-skill-recorder/$commit/install.sh" | SKILL_RECORDER_COMMIT="$commit" bash
-```
+## First run
 
-The commit pins both the downloaded script and the source it builds. To keep the app running
-after the terminal closes, add `SKILL_RECORDER_DETACHED=1` after the pipe:
+1. Grant Screen & System Audio Recording when macOS requests it
+2. Open **Model management**
+3. Select a preset or enable **Custom model** and enter its exact model ID
+4. Enter the provider BaseURL and API key
+5. Choose whether visual analysis is enabled
+6. Test the connection, then save and enable the configuration
 
-```bash
-commit="<40-character-release-commit>"; curl -fsSL "https://raw.githubusercontent.com/Songhonglei/better-skill-recorder/$commit/install.sh" | SKILL_RECORDER_COMMIT="$commit" SKILL_RECORDER_DETACHED=1 bash
-```
+The endpoint must implement OpenAI-compatible Chat Completions, function/tool calls, and
+multi-turn tool execution. Visual analysis additionally requires inline image input.
+Configuration details are in
+[docs/MODEL_CONFIGURATION.md](docs/MODEL_CONFIGURATION.md).
 
-On macOS this adds a **Better Skill Recorder** app to `~/Applications` (relaunch from Spotlight,
-Launchpad, or the Dock). On Ubuntu it adds a matching application entry.
+## Privacy boundary
 
-**Windows (PowerShell)**
+Better Skill Recorder may capture:
 
-```powershell
-$commit="<40-character-release-commit>"; $env:SKILL_RECORDER_COMMIT=$commit; irm "https://raw.githubusercontent.com/Songhonglei/better-skill-recorder/$commit/install.ps1" | iex
-```
+- active application and window titles
+- the active browser URL on macOS
+- screen video and selected snapshots
+- short clipboard previews
+- optional microphone narration
 
-This adds **Better Skill Recorder** shortcuts to your desktop and Start Menu.
+English OCR and sensitive-data heuristics run locally. They reduce exposure but cannot
+guarantee that every secret or personal detail will be detected. Review the recording and
+avoid displaying, typing, copying, or narrating passwords, tokens, private keys, and other
+confidential data.
 
-### Then record
-
-1. **Grant Screen Recording.** On first launch, macOS asks for Screen Recording permission;
-   grant it and you're ready to record. If you replace a locally built, ad-hoc-signed app,
-   macOS may require you to switch its **Screen & System Audio Recording** permission off
-   and on again, then restart the app. Maintainers can use the stable local development
-   signing workflow in [`INSTALL.md`](INSTALL.md#stable-local-package-signing-macos) to avoid
-   changing the app's permission identity on every rebuild.
-2. **Record, Analyze, Create.** Do your task, then Analyze. The first time you Analyze,
-   Better Skill Recorder offers **Sign in to Copilot** if that is your selected provider
-   and you aren't signed in yet. Custom-provider users configure their endpoint under
-   **Sessions → Model control**.
-
-To inspect the script before running it, set install options, update, or uninstall, see
-[`INSTALL.md`](INSTALL.md).
-
-> ⚠️ **Keep secrets out of your recordings.** Don't record, type, paste, or narrate
-> passwords, tokens, API keys, or other confidential info. Choosing *Analyze* sends
-> recording data to the configured provider. Better Skill Recorder reminds you before every recording.
-> Details in [What gets captured](#what-gets-captured).
-
----
-
-*Everything below is for people who want the details, or want to hack on the code.*
-
-## What gets captured
-
-Recording, storage, frame extraction, and optional narration transcription all happen
-**on your computer**; nothing leaves while you record. Only when you choose **Analyze**
-does Better Skill Recorder send the event timeline (window/document titles, URLs, and clipboard
-previews), extracted screen images, and narration text to the provider you selected. With
-GitHub Copilot that is GitHub's cloud; with an OpenAI-compatible provider it is the configured
-endpoint. Turning off Visual analysis omits the extracted screen images.
-
-The in-app "Records your screen and activity" panel spells out exactly what's collected:
-
-- **Window tracking:** active-app / window switches.
-- **Browser URLs:** the page you're on (macOS).
-- **Screen video:** recorded by Chromium; low-rate snapshots are kept only when the
-  screen changes or a heartbeat is due.
-- **Clipboard:** short previews of copied text that tie steps together.
-- **Narration** *(optional)*: spoken commentary, transcribed **on-device** in any of
-  Whisper's 99 supported languages (a one-time ~252 MB model download on first use).
-
-> ⚠️ **Please don't capture secrets.** Passwords, access tokens, API keys, credentials, and
-> other confidential information should never be recorded, typed, pasted, shown, copied,
-> or narrated during a session.
+When you choose **Analyze**, selected event data, narration text, and—when visual analysis
+is enabled—redacted screenshots are sent to the endpoint you configured. The project does
+not provide or proxy that model service.
 
 ## Develop from source
 
-Requires **Node.js 24**. After checking out a release revision:
+Requirements:
+
+- Apple Silicon Mac
+- Node.js `>=24.19.0 <25`
+- npm `>=11.17.0`
 
 ```bash
-npm ci
+git clone https://github.com/Songhonglei/better-skill-recorder.git
+cd better-skill-recorder
+npm ci --ignore-scripts=false --dangerously-allow-all-scripts=false --strict-allow-scripts
+npm run assets:prepare
 npm run compliance:licenses
 npm run dev
 ```
 
-`npm run dev` starts Vite and launches the Electron app with hot-reload; `⌘⇧R` (macOS) /
-`Ctrl+Shift+R` (Windows) toggles recording from anywhere. Full manual setup, the build and
-`dist` scripts, and the licensing boundary between local source builds and redistributable
-packages are in [`INSTALL.md`](INSTALL.md). Maintainers changing versions, dependencies,
-assets, or releases must follow [`RELEASING.md`](RELEASING.md).
-
-## Evals
-
-The Copilot **describer** and **builders** have a fixture-based eval suite; see
-[`evals/README.md`](evals/README.md).
+Useful checks:
 
 ```bash
-npm run eval            # score the describer against synthetic recordings
-npm run eval:builder    # score the skill/automation generalization
+npm run check:lockfile
+npm run typecheck
+npm run typecheck:evals
+npm test
+npm run build
 ```
 
 ## Documentation
 
-- **[INSTALL.md](INSTALL.md):** install options, inspect-first install, updating,
-  uninstalling, and manual developer setup.
-- **[RELEASING.md](RELEASING.md):** maintainer release runbook.
-- **[evals/README.md](evals/README.md):** the describer / builder eval harness.
-- **[docs/MODEL_CONFIGURATION.md](docs/MODEL_CONFIGURATION.md):** custom endpoint UI,
-  JSON configuration, secure API-key storage, precedence, and endpoint requirements.
-- **[docs/OPENAI_COMPATIBLE_VALIDATION.md](docs/OPENAI_COMPATIBLE_VALIDATION.md):** tested
-  models, end-to-end validation scope, privacy boundary, and known limitations.
-- **[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md):** licenses for bundled dependencies.
-
-## Security
-
-Please don't report security vulnerabilities through public GitHub issues. See
-[`SECURITY.md`](SECURITY.md) for Microsoft's coordinated-disclosure process and reporting
-channels.
-
-## Support
-
-File bugs and feature requests through
-**[GitHub Issues](https://github.com/Songhonglei/better-skill-recorder/issues)** (search existing issues
-first to avoid duplicates). Support is limited to the resources described in
-[`SUPPORT.md`](SUPPORT.md).
-
-## License
-
-[MIT](LICENSE)
+- [INSTALL.md](INSTALL.md) — unsigned preview installation and removal
+- [RELEASING.md](RELEASING.md) — maintainer release checklist
+- [Model configuration](docs/MODEL_CONFIGURATION.md) — endpoint, presets, and storage
+- [Provider validation](docs/OPENAI_COMPATIBLE_VALIDATION.md) — compatibility boundaries
+- [Third-party notices](THIRD-PARTY-NOTICES.md) — bundled components and licenses
+- [Security policy](SECURITY.md) — private vulnerability reporting
+- [Support](SUPPORT.md) — help and issue scope
 
 ## Contributing
 
-This project welcomes contributions and suggestions.  Most contributions require you to agree to a
-Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
-the rights to use your contribution. For details, visit [Contributor License Agreements](https://cla.opensource.microsoft.com).
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) and follow the
+[Code of Conduct](CODE_OF_CONDUCT.md). Do not include recordings, credentials, model keys,
+or third-party assets without redistribution permission.
 
-When you submit a pull request, a CLA bot will automatically determine whether you need to provide
-a CLA and decorate the PR appropriately (e.g., status check, comment). Simply follow the instructions
-provided by the bot. You will only need to do this once across all repos using our CLA.
+## License and attribution
 
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
-For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
-contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
-
-## Trademarks
-
-This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft
-trademarks or logos is subject to and must follow
-[Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/legal/intellectualproperty/trademarks/usage/general).
-Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship.
-Any use of third-party trademarks or logos are subject to those third-party's policies.
+The project is available under the [MIT License](LICENSE). It is based on Microsoft's
+original Skill Recorder project and includes substantial independent modifications.
+Microsoft does not sponsor or support this fork.

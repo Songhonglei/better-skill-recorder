@@ -3,9 +3,9 @@ import test from "node:test";
 
 import { createAnalyzeRuntime, OPENAI_COMPATIBLE_ENV } from "./runtime-factory";
 
-test("Analyze runtime defaults to Copilot and accepts temporary custom configuration", async () => {
+test("Analyze runtime is custom-model-only and accepts temporary configuration", async () => {
   const defaultRuntime = createAnalyzeRuntime("FactoryTest", {});
-  assert.equal(defaultRuntime.id, "copilot");
+  assert.equal(defaultRuntime.id, "openai-compatible");
   await defaultRuntime.dispose();
 
   const env: NodeJS.ProcessEnv = {

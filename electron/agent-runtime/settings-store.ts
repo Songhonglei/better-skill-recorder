@@ -30,6 +30,8 @@ const SECRET_VERSION = 1;
 const ModelPresetSchema = z.object({
   id: z.string().trim().min(1).max(256),
   label: z.string().trim().min(1).max(128),
+  baseUrl: z.string().trim().min(1).max(2048).optional(),
+  tokenPlanBaseUrl: z.string().trim().min(1).max(2048).optional(),
   badge: z.string().trim().min(1).max(3).optional(),
   source: z.string().trim().min(1).max(128).optional(),
   verified: z.boolean().optional(),
@@ -40,8 +42,27 @@ const DEFAULT_MODEL_PRESETS = z.array(ModelPresetSchema).max(100).parse(
   defaultModelPresetsJson,
 ) as AgentModelPreset[];
 
+const TOKEN_PLAN_BASE_URL = "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1";
+const LEGACY_BUNDLED_MODEL_IDS = new Set([
+  "qwen3.7-plus",
+  "qwen3.8-max",
+  "kimi-k2.5",
+  "kimi-k2.6",
+]);
+
+function isLegacyBundledPresetSet(presets: AgentModelPreset[]): boolean {
+  return presets.length > 0 && presets.every((preset) =>
+    LEGACY_BUNDLED_MODEL_IDS.has(preset.id) &&
+    !preset.tokenPlanBaseUrl &&
+    ["Alibaba Cloud Token Plan", "Alibaba Cloud Model Studio API"].includes(preset.source ?? "") &&
+    [TOKEN_PLAN_BASE_URL, "https://dashscope.aliyuncs.com/compatible-mode/v1"].includes(preset.baseUrl ?? "")
+  );
+}
+
 const ConfigSchema = z.object({
   version: z.literal(1),
+  // Accept the retired value only so existing installs migrate cleanly. It is
+  // rewritten to an unconfigured custom endpoint on the next load.
   provider: z.enum(["copilot", "openai-compatible"]),
   openaiCompatible: z.object({
     baseUrl: z.string().max(2048),
@@ -60,7 +81,7 @@ const SecretSchema = z.object({
 
 const DEFAULT_CONFIG: AgentProviderConfigFile = {
   version: 1,
-  provider: "copilot",
+  provider: "openai-compatible",
   openaiCompatible: {
     baseUrl: "",
     model: "",
@@ -151,8 +172,8 @@ function validateInput(
   if (input.apiKey && input.apiKey.length > 16 * 1024) {
     throw new Error("API key is too large.");
   }
-  if (input.provider !== "copilot" && input.provider !== "openai-compatible") {
-    throw new Error("Choose GitHub Copilot or an OpenAI-compatible provider.");
+  if (input.provider !== "openai-compatible") {
+    throw new Error("Choose an OpenAI-compatible provider.");
   }
   const config: AgentProviderConfigFile = {
     version: 1,
@@ -202,15 +223,29 @@ export class AgentSettingsStore {
         throw new Error("Provider configuration is too large.");
       }
       const parsed = ConfigSchema.parse(JSON.parse(raw));
-      const needsPresetMigration = parsed.openaiCompatible.modelPresets === undefined;
+      const configuredPresets = parsed.openaiCompatible.modelPresets ?? DEFAULT_MODEL_PRESETS;
+      const presetsWithBundledEndpoints = configuredPresets.map((preset) => {
+        if (preset.baseUrl) return preset;
+        const bundled = DEFAULT_MODEL_PRESETS.find((candidate) => candidate.id === preset.id);
+        return bundled?.baseUrl ? { ...preset, baseUrl: bundled.baseUrl } : preset;
+      });
+      const migratedBundledPresets = isLegacyBundledPresetSet(presetsWithBundledEndpoints)
+        ? DEFAULT_MODEL_PRESETS
+        : presetsWithBundledEndpoints;
+      const needsPresetMigration = parsed.openaiCompatible.modelPresets === undefined ||
+        migratedBundledPresets !== presetsWithBundledEndpoints ||
+        presetsWithBundledEndpoints.some((preset, index) => preset !== configuredPresets[index]);
+      const needsProviderMigration = parsed.provider === "copilot";
       this.fileConfig = {
         ...parsed,
+        provider: "openai-compatible",
         openaiCompatible: {
           ...parsed.openaiCompatible,
-          modelPresets: parsed.openaiCompatible.modelPresets ?? DEFAULT_MODEL_PRESETS,
+          ...(needsProviderMigration ? { baseUrl: "", model: "" } : {}),
+          modelPresets: migratedBundledPresets,
         },
       };
-      if (needsPresetMigration) {
+      if (needsPresetMigration || needsProviderMigration) {
         atomicWrite(this.options.configPath, `${JSON.stringify(this.fileConfig, null, 2)}\n`);
       }
     } catch (error) {
@@ -222,6 +257,7 @@ export class AgentSettingsStore {
 
   snapshot(): AgentProviderSettings {
     const effective = this.effectiveValues();
+    const configured = Boolean(effective.baseUrl.trim() && effective.model.trim());
     const referencedKey = this.fileConfig.openaiCompatible.apiKeyEnv
       ? this.env[this.fileConfig.openaiCompatible.apiKeyEnv]
       : undefined;
@@ -229,34 +265,40 @@ export class AgentSettingsStore {
     // Do not touch Keychain/credential storage when an environment key already
     // wins. Besides being unnecessary, a newly signed local build may trigger a
     // blocking OS authorization prompt before the first application window exists.
-    const secureKey = hasEnvironmentKey ? undefined : this.readSecureApiKey();
+    // Presence is enough for the settings UI. Never decrypt merely to render a
+    // page: locally signed updates may require a visible Keychain confirmation.
+    const hasStoredKey = configured && existsSync(this.options.secretPath);
     return {
       provider: effective.provider,
       baseUrl: effective.baseUrl,
       model: effective.model,
       vision: effective.vision,
       modelPresets: this.fileConfig.openaiCompatible.modelPresets,
-      hasApiKey: Boolean(hasEnvironmentKey || secureKey),
+      hasApiKey: Boolean(hasEnvironmentKey || hasStoredKey),
       apiKeySource: hasEnvironmentKey
         ? "environment"
-        : secureKey
+        : hasStoredKey
           ? "secure-storage"
           : "none",
       secureStorageAvailable:
         this.options.secureStorageAvailable ?? this.options.codec.available(),
       configPath: this.options.configPath,
+      configured,
       ...(this.configError ? { configError: this.configError } : {}),
       environmentOverrides: this.environmentOverrides(),
     };
   }
 
-  runtimeConfiguration(): AgentRuntimeConfiguration {
+  runtimeConfiguration(options: { includeSecureKey?: boolean } = {}): AgentRuntimeConfiguration {
     const effective = this.effectiveValues();
-    if (effective.provider === "copilot") return { provider: "copilot" };
+    const configured = Boolean(effective.baseUrl.trim() && effective.model.trim());
     const referencedKey = this.fileConfig.openaiCompatible.apiKeyEnv
       ? this.env[this.fileConfig.openaiCompatible.apiKeyEnv]
       : undefined;
-    const apiKey = this.environmentApiKey || referencedKey || this.readSecureApiKey();
+    const apiKey = configured
+      ? this.environmentApiKey || referencedKey ||
+        (options.includeSecureKey === false ? undefined : this.readSecureApiKey())
+      : undefined;
     return {
       provider: "openai-compatible",
       baseUrl: effective.baseUrl,
@@ -268,7 +310,6 @@ export class AgentSettingsStore {
 
   preview(input: AgentProviderSettingsInput): AgentRuntimeConfiguration {
     const config = validateInput(input, this.fileConfig.openaiCompatible.modelPresets);
-    if (config.provider === "copilot") return { provider: "copilot" };
     const typedKey = input.apiKey?.trim();
     const existingKey = input.clearApiKey ? undefined : this.runtimeApiKey();
     return {
@@ -294,20 +335,17 @@ export class AgentSettingsStore {
   }
 
   private effectiveValues(): {
-    provider: "copilot" | "openai-compatible";
+    provider: "openai-compatible";
     baseUrl: string;
     model: string;
     vision: boolean;
   } {
     const envProvider = this.env[OPENAI_COMPATIBLE_ENV.provider]?.trim();
-    if (envProvider && envProvider !== "copilot" && envProvider !== "openai-compatible") {
-      throw new Error(`${OPENAI_COMPATIBLE_ENV.provider} must be "copilot" or "openai-compatible".`);
+    if (envProvider && envProvider !== "openai-compatible") {
+      throw new Error(`${OPENAI_COMPATIBLE_ENV.provider} must be "openai-compatible".`);
     }
-    const provider = envProvider === "copilot" || envProvider === "openai-compatible"
-      ? envProvider
-      : this.fileConfig.provider;
     return {
-      provider,
+      provider: "openai-compatible",
       baseUrl:
         this.env[OPENAI_COMPATIBLE_ENV.baseUrl]?.trim() ||
         this.fileConfig.openaiCompatible.baseUrl,

@@ -1,25 +1,18 @@
-# TODO: The maintainer of this repo has not yet edited this file
-
-**REPO OWNER**: Do you want Customer Service & Support (CSS) support for this product/project?
-
-- **No CSS support:** Fill out this template with information about how to file issues and get help.
-- **Yes CSS support:** Fill out an intake form at [aka.ms/onboardsupport](https://aka.ms/onboardsupport). CSS will work with/help you to determine next steps.
-- **Not sure?** Fill out an intake as though the answer were "Yes". CSS will help you decide.
-
-*Then remove this first heading from this SUPPORT.MD file before publishing your repo.*
-
 # Support
 
-## How to file issues and get help  
+Better Skill Recorder is a community-maintained open-source project without a service-level
+agreement or commercial support commitment.
 
-This project uses GitHub Issues to track bugs and feature requests. Please search the existing 
-issues before filing new issues to avoid duplicates.  For new issues, file your bug or 
-feature request as a new Issue.
+Before opening an issue:
 
-For help and questions about using this project, please **REPO MAINTAINER: INSERT INSTRUCTIONS HERE 
-FOR HOW TO ENGAGE REPO OWNERS OR COMMUNITY FOR HELP. COULD BE A STACK OVERFLOW TAG OR OTHER
-CHANNEL. WHERE WILL YOU HELP PEOPLE?**.
+1. Read `README.md`, `INSTALL.md`, and the model-configuration documentation
+2. Search existing issues
+3. Reproduce with the latest release
+4. Remove API keys, tokens, recordings, screenshots, local paths, and personal information
 
-## Microsoft Support Policy  
+Use GitHub Issues for reproducible bugs and feature requests. Include the app version,
+macOS version, Mac architecture, model provider type, expected behavior, actual behavior,
+and safe reproduction steps.
 
-Support for this **PROJECT or PRODUCT** is limited to the resources listed above.
+Use GitHub's private vulnerability-reporting flow for security issues. Questions about API
+billing, quotas, model availability, and provider accounts belong with that provider.

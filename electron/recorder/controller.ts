@@ -29,6 +29,7 @@ import type { Collector } from "./collector";
 import { CollectorHost } from "./collector";
 import { EventBus } from "./event-bus";
 import { SessionStore } from "./session-store";
+import { markProcessing, finishProcessing } from "./processing-journal";
 
 const log = createLogger("Recorder");
 
@@ -81,6 +82,8 @@ export interface RecorderDeps {
   deleteSession?: (sessionId: string) => Promise<void>;
   /** Optional best-effort post-processing (frames + correlation) after save. */
   postProcess?: (sessionDir: string) => Promise<void>;
+  minimumRecordingSeconds?: () => number;
+  onShortRecordingDiscarded?: (seconds: number) => void;
 }
 
 type FinishIntent = "save" | "discard";
@@ -109,6 +112,17 @@ export class RecorderController {
   private shuttingDown = false;
   private operations: Promise<void> = Promise.resolve();
   private readonly processing = new Set<Promise<void>>();
+  private readonly processingDirs = new Set<string>();
+
+  isProcessing(dir: string): boolean { return this.processingDirs.has(dir); }
+
+  async recoverProcessing(dirs: string[]): Promise<void> {
+    for (const dir of dirs) {
+      if (this.shuttingDown) break;
+      this.schedulePostProcess(dir);
+      await this.whenProcessed();
+    }
+  }
   private lastCompleted: { id: string; dir: string } | null = null;
   private lastProcessed = false;
 
@@ -489,6 +503,10 @@ export class RecorderController {
     const store = this.store;
     if (!store) return { ok: false, error: "Not recording" };
 
+    const minimumSeconds = this.deps.minimumRecordingSeconds?.() ?? 0;
+    const tooShort = intent === "save" && Date.now() - store.meta.startedAt < minimumSeconds * 1000;
+    if (tooShort) intent = "discard";
+
     this.transition = intent === "save" ? "stopping" : "discarding";
     if (this.microphone.state !== "off") {
       this.microphone = {
@@ -577,6 +595,7 @@ export class RecorderController {
       this.transition = "none";
       this.lastFinish = { sessionId: store.meta.id, outcome: "discarded" };
       log.info("Recording discarded:", store.meta.id);
+      if (tooShort) this.deps.onShortRecordingDiscarded?.(minimumSeconds);
       this.emit();
       return { ok: true, sessionId: store.meta.id };
     }
@@ -601,9 +620,11 @@ export class RecorderController {
   }
 
   private schedulePostProcess(dir: string): void {
+    if (this.processingDirs.has(dir)) return;
+    this.processingDirs.add(dir);
     const processing = this.runPostProcess(dir, Promise.resolve());
     this.processing.add(processing);
-    void processing.finally(() => this.processing.delete(processing));
+    void processing.finally(() => { this.processing.delete(processing); this.processingDirs.delete(dir); });
   }
 
   private async runPostProcess(dir: string, closed: Promise<void>): Promise<void> {
@@ -614,11 +635,13 @@ export class RecorderController {
     }
     try {
       await closed;
+      markProcessing(dir);
       await this.deps.postProcess(dir);
+      finishProcessing(dir);
+      if (this.lastCompleted?.dir === dir) this.lastProcessed = true;
     } catch (error) {
       log.warn("post-processing failed:", error instanceof Error ? error.message : error);
     } finally {
-      if (this.lastCompleted?.dir === dir) this.lastProcessed = true;
       this.emit();
     }
   }

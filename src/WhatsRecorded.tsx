@@ -24,23 +24,20 @@ function protectionModelNote(status: SensitiveModelStatus | null): string {
  * and what leaves the machine on analysis. Every claim here is grounded in the
  * actual collectors and describer behavior, so it must be kept in sync with them.
  *
- * Also home to the Advanced-protection opt-out toggle: protection is on by default,
- * and this sheet is where the user reviews what it does and turns it off if they
- * don't want on-device screen-image scanning.
+ * The recorder owns the protection switch; this sheet shows either recording
+ * disclosure or protection details, without mixing settings into the disclosure.
  */
 export function WhatsRecorded({
   onClose,
   onReviewed,
   sensitive,
-  advancedPending,
-  onToggleAdvanced,
+  mode = "recording",
   onDownload,
 }: {
   onClose: () => void;
   onReviewed: () => void;
   sensitive: SensitiveModelStatus | null;
-  advancedPending: boolean;
-  onToggleAdvanced: () => void;
+  mode?: "recording" | "protection";
   onDownload: () => void;
 }) {
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -63,7 +60,7 @@ export function WhatsRecorded({
     <div className="sheet-backdrop" onClick={onClose}>
       <div
         ref={sheetRef}
-        className="sheet"
+        className="sheet disclosure-sheet"
         role="dialog"
         aria-modal="true"
         aria-labelledby="whats-recorded-title"
@@ -88,9 +85,11 @@ export function WhatsRecorded({
               />
             </svg>
           </span>
-          <h2 id="whats-recorded-title">What's recorded</h2>
+          <h2 id="whats-recorded-title">{mode === "protection" ? "Privacy and security protection" : "Recording guide"}</h2>
         </header>
 
+        <div className="disclosure-body">
+        {mode === "recording" && <>
         <p className="sheet-lead">
           This tool records your screen and activity so it can turn what you did into a reusable
           skill. Here is exactly what it captures and what leaves your computer.
@@ -154,55 +153,35 @@ export function WhatsRecorded({
             <li>
               When you choose Analyze, the event timeline (window and document titles, URLs, and
               clipboard previews), plus screen images and narration text if recorded, are sent to
-              the configured analysis provider. GitHub Copilot cloud is the default; a source
-              preview can instead use an explicitly configured custom endpoint.
+              the custom endpoint you configured. If no model is configured, analysis stays
+              unavailable and nothing is sent.
             </li>
             <li>
               By default, before anything is sent, this computer hides sensitive details like
               passwords, keys, emails, and card or ID numbers from that text and from your screen
-              images. You can turn this off below.
+              images. Manage this with Privacy and security protection on the recorder.
             </li>
           </ul>
         </section>
 
-        <section className={`sheet-block sheet-advp ${advancedOn ? "on" : ""}`}>
+        </>}
+        {mode === "protection" && <section className={`sheet-block sheet-advp ${advancedOn ? "on" : ""}`}>
           <div className="sheet-advp-head">
             <div className="sheet-advp-copy">
-              <h3>Advanced protection</h3>
               <p className="sheet-note">
-                On by default. Before your recording is analyzed, it checks the text and your screen
-                images on this computer and hides sensitive details. Turn it off to send everything
-                as recorded.
+                On by default: sensitive text and screen images are masked locally before analysis
               </p>
             </div>
-            <button
-              type="button"
-              className="sheet-switch-btn"
-              role="switch"
-              aria-checked={advancedOn}
-              aria-busy={advancedPending}
-              aria-label="Advanced protection"
-              disabled={advancedPending}
-              onClick={onToggleAdvanced}
-            >
-              <span className={`sheet-switch ${advancedOn ? "on" : ""}`} aria-hidden>
-                <span className="sheet-switch-knob" />
-              </span>
-            </button>
           </div>
-          {advancedOn && (
+          {(
             <>
               <ul>
                 <li>
-                  It hides sensitive details like passwords, keys, emails, and card or ID numbers,
-                  both in the text that is sent (including narration) and in your screen images.
+                  Masks passwords, keys, emails, and card or ID numbers, including narration text
                 </li>
                 <li>
-                  Turning it off sends your recording as recorded. That can make the analysis more
-                  accurate, but nothing is hidden, so only do it when the recording has nothing
-                  sensitive.
+                  When off, original content is sent to your model without masking
                 </li>
-                <li>It all runs on this computer.</li>
               </ul>
               <div className={`sheet-advp-status ${showModelError ? "is-error" : ""}`}>
                 <span className="sheet-advp-model">{protectionModelNote(sensitive)}</span>
@@ -213,21 +192,21 @@ export function WhatsRecorded({
                 )}
               </div>
               <p className="sheet-caution">
-                No method is 100% effective. It can miss details or mask the wrong ones. Treat it as
-                a safety net, not a guarantee, and still avoid capturing anything secret.
+                Masking may miss details or hide the wrong ones — avoid recording secrets
               </p>
             </>
           )}
-        </section>
+        </section>}
 
-        <section className="sheet-block">
+        {mode === "recording" && <section className="sheet-block">
           <h3>What it never does</h3>
           <ul>
             <li>It does not log your keystrokes.</li>
             <li>It only captures while a recording is running. Nothing runs in the background.</li>
           </ul>
-        </section>
+        </section>}
 
+        </div>
         <button className="sheet-close" onClick={onReviewed}>
           Got it
         </button>

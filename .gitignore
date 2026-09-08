@@ -5,6 +5,7 @@ release
 .compliance
 .compliance-cache
 .compliance-review
+electron/assets/models/tessdata/*.traineddata
 *.log
 .DS_Store
 

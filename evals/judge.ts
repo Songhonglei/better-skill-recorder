@@ -1,11 +1,11 @@
-// Optional semantic judge: asks a Copilot agent to rate how faithfully the
+// Optional semantic judge: asks the configured custom model to rate how faithfully the
 // describer's analysis captures the scenario's ground-truth task. Off by default
 // (`--judge`); the deterministic rubric in scoring.ts is the primary signal. This
 // adds a qualitative, human-like second opinion for the overnight report.
 
-import { approveAll, CopilotClient, type Tool } from "@github/copilot-sdk";
-
 import type { Analysis } from "../common/analysis";
+import { createAnalyzeRuntime } from "../electron/agent-runtime/runtime-factory";
+import type { AgentTool } from "../electron/agent-runtime/types";
 import type { Scenario } from "./scenario";
 
 export interface JudgeResult {
@@ -44,11 +44,11 @@ export async function judgeAnalysis(
   analysis: Analysis,
   model?: string,
 ): Promise<JudgeResult> {
-  const client = new CopilotClient();
-  await client.start();
+  const runtime = createAnalyzeRuntime("EvalJudge");
+  await runtime.checkConnection();
   try {
     const holder: { result: JudgeResult | undefined } = { result: undefined };
-    const submit: Tool = {
+    const submit: AgentTool = {
       name: "submit_judgement",
       description: "Submit your final faithfulness grade (0–5) for the produced analysis.",
       parameters: {
@@ -61,7 +61,8 @@ export async function judgeAnalysis(
         required: ["score", "verdict"],
         additionalProperties: false,
       },
-      handler: (raw) => {
+      completesRun: true,
+      handler: (raw: unknown) => {
         const r = (raw ?? {}) as { score?: number; verdict?: string; reasons?: string };
         holder.result = {
           score: Math.max(0, Math.min(5, Number(r.score) || 0)),
@@ -73,19 +74,16 @@ export async function judgeAnalysis(
       },
     };
 
-    const session = await client.createSession({
-      systemMessage: { mode: "append", content: JUDGE_INSTRUCTIONS },
+    const session = await runtime.createSession({
+      systemInstructions: JUDGE_INSTRUCTIONS,
       tools: [submit],
-      onPermissionRequest: approveAll,
-      enableHostGitOperations: false,
-      infiniteSessions: { enabled: false },
       ...(model ? { model } : {}),
     });
-    await session.sendAndWait(renderPrompt(scenario, analysis), 120_000);
-    await session.disconnect().catch(() => undefined);
+    await session.run(renderPrompt(scenario, analysis), { timeoutMs: 120_000 });
+    await session.dispose().catch(() => undefined);
     if (!holder.result) throw new Error("judge did not submit a grade");
     return holder.result;
   } finally {
-    await client.stop().catch(() => undefined);
+    await runtime.dispose().catch(() => undefined);
   }
 }

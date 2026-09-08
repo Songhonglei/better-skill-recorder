@@ -5,6 +5,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  type MouseEvent,
   type ReactNode,
 } from "react";
 
@@ -76,6 +77,10 @@ export function ThemeSwitcher() {
   const label = language === "zh-CN"
     ? `当前为${theme === "dark" ? "暗色" : "亮色"}模式，点击切换为${next === "dark" ? "暗色" : "亮色"}模式`
     : `${theme === "dark" ? "Dark" : "Light"} mode. Switch to ${next} mode`;
+  const switchTheme = (event: MouseEvent<HTMLButtonElement>) => {
+    event.currentTarget.blur();
+    setTheme(next);
+  };
 
   return (
     <button
@@ -84,8 +89,7 @@ export function ThemeSwitcher() {
       data-theme-state={theme}
       data-no-localize
       aria-label={label}
-      title={label}
-      onClick={() => setTheme(next)}
+      onClick={switchTheme}
     >
       {theme === "dark" ? (
         <svg viewBox="0 0 20 20" aria-hidden>

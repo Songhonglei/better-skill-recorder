@@ -1,8 +1,12 @@
-export type ConfiguredAgentProvider = "copilot" | "openai-compatible";
+export type ConfiguredAgentProvider = "openai-compatible";
 
 export interface AgentModelPreset {
   id: string;
   label: string;
+  /** Suggested OpenAI-compatible endpoint; selecting the preset fills this value. */
+  baseUrl?: string;
+  /** Optional subscription endpoint selected by the Token Plan checkbox. */
+  tokenPlanBaseUrl?: string;
   /** Short mark shown in the picker; derived from the label when omitted. */
   badge?: string;
   /** Endpoint or provider on which this preset was verified. */
@@ -36,6 +40,8 @@ export interface AgentProviderSettings {
   apiKeySource: "none" | "secure-storage" | "environment";
   secureStorageAvailable: boolean;
   configPath: string;
+  /** True once the endpoint and model are ready for Analyze and Skill generation. */
+  configured: boolean;
   configError?: string;
   /** Fields whose effective values currently come from process environment. */
   environmentOverrides: readonly string[];

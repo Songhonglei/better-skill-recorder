@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { chmodSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -54,6 +54,10 @@ chmodSync(signingDirectory, 0o700);
 
 const rootKey = join(signingDirectory, "local-root.key");
 const rootCertificate = join(signingDirectory, "local-root.pem");
+if (existsSync(rootKey) || existsSync(rootCertificate)) {
+  console.error("Existing signing material found, but its identity is unavailable. Restore/unlock its keychain identity instead of replacing the certificate; replacement invalidates macOS permissions.");
+  process.exit(1);
+}
 const leafKey = join(signingDirectory, "local-codesign.key");
 const leafRequest = join(signingDirectory, "local-codesign.csr");
 const leafCertificate = join(signingDirectory, "local-codesign.pem");

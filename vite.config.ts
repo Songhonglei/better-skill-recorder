@@ -52,7 +52,7 @@ export default defineConfig({
           // which would start our process as a bare Node runtime instead of a GUI app.
           const env = { ...process.env };
           delete env.ELECTRON_RUN_AS_NODE;
-          void args.startup([".", "--no-sandbox"], { env });
+          void args.startup(["."], { env });
         },
         vite: {
           build: {

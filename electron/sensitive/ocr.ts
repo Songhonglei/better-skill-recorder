@@ -2,8 +2,7 @@
 // (Apache-2.0) behind a small worker pool. Used only to LOCATE text regions in
 // screen frames so they can be blurred before a JPEG leaves the machine — the OCR
 // text itself is never sent to the model. Fully offline: the WASM core ships in
-// the tesseract.js-core node_module and the language data is a local file the
-// model manager downloads once into the app's models dir.
+// the tesseract.js-core node_module and English language data ships with the app.
 
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";

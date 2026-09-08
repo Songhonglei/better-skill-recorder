@@ -1,4 +1,4 @@
-// Eval harness: runs the multi-turn Copilot describer against each fixed
+// Eval harness: runs the multi-turn configured-model describer against each fixed
 // scenario and scores the resulting analysis against its rubric.
 //
 // For every scenario it: materializes a synthetic session (session.json +

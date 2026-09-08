@@ -1,5 +1,8 @@
 # OpenAI-Compatible Provider Evolution Plan
 
+> **Archived design plan.** This records the migration from the upstream Copilot runtime.
+> It is not current product documentation; the shipped app is custom-provider only.
+
 ## 1. Objective
 
 Evolve Skill Recorder from a GitHub Copilot-only application into a dual-provider

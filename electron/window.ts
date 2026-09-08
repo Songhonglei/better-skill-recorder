@@ -1,5 +1,6 @@
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { trustApplicationWindow } from "./trusted-ipc";
 
 import { BrowserWindow, screen } from "electron";
 
@@ -29,6 +30,7 @@ let recordingControlsAnchor: { x: number; bottom: number } | null = null;
 
 function loadRoute(win: BrowserWindow, hash?: string): void {
   const devUrl = process.env.VITE_DEV_SERVER_URL;
+  trustApplicationWindow(win, devUrl || pathToFileURL(path.join(dirname, "..", "dist", "index.html")).href);
   if (devUrl) {
     void win.loadURL(hash ? `${devUrl}#${hash}` : devUrl);
   } else {
@@ -60,7 +62,7 @@ export function createRecorderWindow(): BrowserWindow {
       preload: path.join(dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
     },
   });
   registerDevelopmentDevToolsShortcut(win);
@@ -101,7 +103,7 @@ export function createRecordingControlsWindow(): BrowserWindow {
       preload: path.join(dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
       backgroundThrottling: false,
     },
   });
@@ -195,7 +197,7 @@ export function createLibraryWindow(recorder: BrowserWindow): BrowserWindow {
       preload: path.join(dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
     },
   });
   registerDevelopmentDevToolsShortcut(win);

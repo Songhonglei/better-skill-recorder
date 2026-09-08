@@ -42,6 +42,6 @@ test("degraded macOS window lookup disables permission-gated fields", () => {
       accessibilityPermission: true,
       screenRecordingPermission: true,
     }),
-    [],
+    ["--no-accessibility-permission"],
   );
 });

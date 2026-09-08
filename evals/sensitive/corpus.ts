@@ -2,7 +2,7 @@
 //
 // Each case is a single outgoing text string plus two ground-truth lists:
 //   - mustRedact: raw substrings that MUST be detected and masked out before the
-//     text could be sent to GitHub Copilot (recall).
+//     text could be sent to the configured endpoint (recall).
 //   - mustKeep: non-sensitive substrings that MUST survive redaction untouched
 //     (precision — guards against over-masking ordinary prose).
 //

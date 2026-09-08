@@ -26,7 +26,7 @@ createRoot(root).render(
     <ThemeProvider>
       <LanguageProvider>
         <UiLocalizer>
-          {!isRecordingControls && (
+          {!isRecordingControls && !isLibrary && (
             <div className="interface-controls">
               <ThemeSwitcher />
               <LanguageSwitcher />

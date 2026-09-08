@@ -1,5 +1,8 @@
 # Windows validation
 
+> **Archived upstream validation.** Windows is not supported or packaged by the current
+> Better Skill Recorder release. This file is retained only as historical engineering context.
+
 Skill Recorder supports native Windows 11 builds for both x64 and ARM64. The
 architecture gate lives in [`.github/workflows/windows.yml`](.github/workflows/windows.yml)
 and runs on GitHub's `windows-latest` and native `windows-11-arm` images.

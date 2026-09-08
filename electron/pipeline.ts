@@ -108,5 +108,6 @@ export async function processSession(sessionDir: string): Promise<void> {
     );
   } catch (err) {
     log.warn("bundle/describe failed:", err instanceof Error ? err.message : err);
+    throw err;
   }
 }

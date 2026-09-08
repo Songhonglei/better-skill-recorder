@@ -16,14 +16,9 @@ const POLL_MS_BROWSER = 1600;
 /** Minimum spacing between URL reads while a browser stays frontmost (SPA navs). */
 const URL_MIN_INTERVAL_MS = 1500;
 
-/** get-windows options for each capture mode. */
+/** Permission options understood by the native macOS collector. */
 const FULL = { accessibilityPermission: true, screenRecordingPermission: true } as const;
 const DEGRADED = { accessibilityPermission: false, screenRecordingPermission: false } as const;
-const GET_WINDOWS_PACKAGE = "get-windows";
-
-interface GetWindowsModule {
-  activeWindow(options: typeof FULL | typeof DEGRADED): Promise<ActiveWindowResult | undefined>;
-}
 
 interface Bounds {
   x: number;
@@ -112,22 +107,17 @@ export class ActiveWindowCollector implements Collector {
   }
 
   private async readPlatform(): Promise<ActiveWindowResult | undefined> {
-    if (process.platform === "darwin") {
-      return readMacOSActiveWindow(this.mode === "full" ? FULL : DEGRADED);
+    if (process.platform !== "darwin") {
+      throw new Error("This Better Skill Recorder build supports macOS only.");
     }
-    if (process.platform === "win32") {
-      const { readWindowsActiveWindow } = await import("./windows-active-window");
-      return readWindowsActiveWindow();
-    }
-    const { activeWindow } = await import(GET_WINDOWS_PACKAGE) as GetWindowsModule;
-    return activeWindow(this.mode === "full" ? FULL : DEGRADED);
+    return readMacOSActiveWindow(this.mode === "full" ? FULL : DEGRADED);
   }
 
   private async read(): Promise<ActiveWindowResult | undefined> {
     try {
       return await this.readPlatform();
     } catch (err) {
-      if (process.platform !== "win32" && this.mode === "full") {
+      if (this.mode === "full") {
         this.mode = "degraded";
         this.ctx?.log.warn(
           "Reduced capture: window titles/URLs need a screen-capture / accessibility permission.",

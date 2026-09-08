@@ -1,4 +1,4 @@
-name: Non-Windows
+name: macOS checks
 
 on:
   push:
@@ -11,15 +11,9 @@ permissions:
 
 jobs:
   build:
-    name: ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    name: macOS ARM64
+    runs-on: macos-15
     timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - macos-latest
-          - ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -28,40 +22,20 @@ jobs:
           node-version: 24.19.0
           cache: npm
 
+      - name: Use policy-capable npm
+        run: npm install --global npm@11.17.0
+
+      - name: Verify runner architecture and toolchain
+        run: |
+          test "$(node -p process.arch)" = "arm64"
+          node --version
+          npm --version
+
       - name: Validate lockfile portability
         run: npm run check:lockfile
 
-      - name: Validate source installer guardrails
-        run: |
-          bash -n install.sh
-          set +e
-          output="$(SKILL_RECORDER_COMMIT=main bash install.sh 2>&1)"
-          status=$?
-          set -e
-          if [ "$status" -eq 0 ]; then
-            echo "install.sh accepted a mutable source reference" >&2
-            exit 1
-          fi
-          printf '%s\n' "$output" | grep -q "full 40-character"
-
-      - name: Test commit-pinned source installation
-        env:
-          SKILL_RECORDER_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
-          SKILL_RECORDER_INSTALL_ROOT: ${{ runner.temp }}/skill-recorder-source
-          SKILL_RECORDER_NO_LAUNCH: "1"
-        run: bash install.sh
-
-      - name: Verify macOS relaunch app bundle
-        if: runner.os == 'macOS'
-        run: |
-          app="$HOME/Applications/Skill Recorder (Source).app"
-          stub="$app/Contents/MacOS/skill-recorder-source"
-          plist="$app/Contents/Info.plist"
-          test -d "$app"
-          test -x "$stub"
-          plutil -lint "$plist"
-
       - run: npm ci --ignore-scripts=false --dangerously-allow-all-scripts=false --strict-allow-scripts
+      - run: npm run assets:prepare
       - name: Cache compliance source downloads
         uses: actions/cache@v4
         with:
@@ -69,15 +43,8 @@ jobs:
           key: compliance-${{ runner.os }}-${{ hashFiles('third_party/compliance-policy.json') }}
           restore-keys: compliance-${{ runner.os }}-
 
-      # macOS arm64 is a release target, so it must be able to produce the complete
-      # corresponding-source bundle. Linux installs from source and only needs the
-      # license inventory.
-      - name: Prepare compliance materials (release target)
-        if: runner.os == 'macOS'
+      - name: Prepare compliance materials
         run: npm run compliance:prepare
-      - name: Prepare compliance licenses (source-install platform)
-        if: runner.os != 'macOS'
-        run: npm run compliance:licenses
       - name: Verify platform license coverage
         run: |
           node --input-type=module -e "
@@ -104,11 +71,12 @@ jobs:
               if (native.packages[0].name === excluded)
                 throw new Error('An excluded WASM package was selected as the native payload');
           "
-      - name: Verify optional window provider
+      - name: Verify active-window provider
         run: >-
           node --input-type=module -e
           "const m = await import('get-windows');
           if (typeof m.activeWindow !== 'function')
           throw new Error('get-windows activeWindow export is unavailable')"
       - run: npm test
+      - run: npm run typecheck:evals
       - run: npm run build

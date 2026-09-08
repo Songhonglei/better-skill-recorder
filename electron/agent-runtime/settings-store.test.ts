@@ -57,11 +57,15 @@ test("provider settings persist non-secrets and keep the API key encrypted", (t)
   const { root, store } = fixture();
   t.after(() => rmSync(root, { recursive: true, force: true }));
 
-  assert.equal(store.snapshot().provider, "copilot");
+  assert.equal(store.snapshot().provider, "openai-compatible");
+  assert.equal(store.snapshot().configured, false);
   assert.deepEqual(
     store.snapshot().modelPresets.map((preset) => preset.id),
     ["qwen3.7-plus", "qwen3.8-max", "kimi-k2.5", "kimi-k2.6"],
   );
+  const qwen37 = store.snapshot().modelPresets.find((preset) => preset.id === "qwen3.7-plus");
+  assert.equal(qwen37?.baseUrl, "https://dashscope.aliyuncs.com/compatible-mode/v1");
+  assert.equal(qwen37?.tokenPlanBaseUrl, "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1");
   const saved = store.save({
     provider: "openai-compatible",
     baseUrl: "http://127.0.0.1:11434/v1/",
@@ -71,6 +75,7 @@ test("provider settings persist non-secrets and keep the API key encrypted", (t)
   });
 
   assert.equal(saved.provider, "openai-compatible");
+  assert.equal(saved.configured, true);
   assert.equal(saved.hasApiKey, true);
   assert.equal(saved.apiKeySource, "secure-storage");
   const configText = readFileSync(saved.configPath, "utf8");
@@ -84,6 +89,30 @@ test("provider settings persist non-secrets and keep the API key encrypted", (t)
     supportsVision: true,
     apiKey: "secret-value",
   });
+});
+
+test("legacy Copilot settings migrate to first-run custom model setup", (t) => {
+  const { root, store } = fixture();
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  writeFileSync(
+    path.join(root, "agent-provider.json"),
+    JSON.stringify({
+      version: 1,
+      provider: "copilot",
+      openaiCompatible: {
+        baseUrl: "https://legacy.example/v1",
+        model: "legacy-model",
+        vision: true,
+      },
+    }),
+  );
+
+  const migrated = store.reload();
+  assert.equal(migrated.provider, "openai-compatible");
+  assert.equal(migrated.configured, false);
+  assert.equal(migrated.baseUrl, "");
+  assert.equal(migrated.model, "");
+  assert.doesNotMatch(readFileSync(migrated.configPath, "utf8"), /"provider": "copilot"/);
 });
 
 test("model presets are globally configurable and survive UI settings saves", (t) => {
@@ -101,6 +130,7 @@ test("model presets are globally configurable and survive UI settings saves", (t
         modelPresets: [{
           id: "company-vision",
           label: "Company Vision",
+          baseUrl: "https://custom.example/v1",
           badge: "CV",
           source: "Internal gateway",
           verified: true,
@@ -112,6 +142,7 @@ test("model presets are globally configurable and survive UI settings saves", (t
 
   const reloaded = store.reload();
   assert.deepEqual(reloaded.modelPresets.map((preset) => preset.id), ["company-vision"]);
+  assert.equal(reloaded.modelPresets[0]?.baseUrl, "https://custom.example/v1");
   const saved = store.save({
     provider: "openai-compatible",
     baseUrl: reloaded.baseUrl,
@@ -120,6 +151,74 @@ test("model presets are globally configurable and survive UI settings saves", (t
   });
   assert.deepEqual(saved.modelPresets.map((preset) => preset.id), ["company-vision"]);
   assert.match(readFileSync(saved.configPath, "utf8"), /"Internal gateway"/);
+  assert.match(readFileSync(saved.configPath, "utf8"), /https:\/\/custom\.example\/v1/);
+});
+
+test("bundled presets gain their suggested endpoint without replacing custom entries", (t) => {
+  const { root, store } = fixture();
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  writeFileSync(
+    path.join(root, "agent-provider.json"),
+    JSON.stringify({
+      version: 1,
+      provider: "openai-compatible",
+      openaiCompatible: {
+        baseUrl: "https://old.example/v1",
+        model: "qwen3.7-plus",
+        vision: true,
+        modelPresets: [
+          { id: "qwen3.7-plus", label: "Qwen 3.7 Plus" },
+          { id: "local-model", label: "Local model" },
+        ],
+      },
+    }),
+  );
+
+  const reloaded = store.reload();
+  assert.equal(
+    reloaded.modelPresets[0]?.baseUrl,
+    "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  );
+  assert.equal(reloaded.modelPresets[1]?.baseUrl, undefined);
+  assert.match(readFileSync(reloaded.configPath, "utf8"), /dashscope\.aliyuncs\.com/);
+});
+
+test("legacy bundled presets migrate to a Token Plan endpoint toggle", (t) => {
+  const { root, store } = fixture();
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  writeFileSync(
+    path.join(root, "agent-provider.json"),
+    JSON.stringify({
+      version: 1,
+      provider: "openai-compatible",
+      openaiCompatible: {
+        baseUrl: "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        model: "qwen3.7-plus",
+        vision: true,
+        modelPresets: [
+          {
+            id: "qwen3.7-plus",
+            label: "Qwen 3.7 Plus",
+            baseUrl: "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+            source: "Alibaba Cloud Token Plan",
+          },
+          {
+            id: "qwen3.8-max",
+            label: "Qwen 3.8 Max",
+            baseUrl: "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+            source: "Alibaba Cloud Token Plan",
+          },
+        ],
+      },
+    }),
+  );
+
+  const migrated = store.reload();
+  const qwen37 = migrated.modelPresets.filter((preset) => preset.id === "qwen3.7-plus");
+  assert.equal(qwen37.length, 1);
+  assert.equal(qwen37[0]?.baseUrl, "https://dashscope.aliyuncs.com/compatible-mode/v1");
+  assert.equal(qwen37[0]?.tokenPlanBaseUrl, "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1");
+  assert.match(readFileSync(migrated.configPath, "utf8"), /"tokenPlanBaseUrl"/);
 });
 
 test("environment overrides win over the configuration file", (t) => {
@@ -185,6 +284,65 @@ test("an environment API key avoids unnecessary secure-storage decryption", (t) 
   assert.equal(store.snapshot().apiKeySource, "environment");
   assert.equal(decryptCalls, 0);
   assert.equal(availabilityCalls, 0);
+});
+
+test("first-run setup never probes secure storage before endpoint and model exist", (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "skill-recorder-settings-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  let decryptCalls = 0;
+  const store = new AgentSettingsStore({
+    configPath: path.join(root, "agent-provider.json"),
+    secretPath: path.join(root, "agent-provider.secrets.json"),
+    codec: {
+      ...testCodec,
+      decrypt: (value) => {
+        decryptCalls += 1;
+        return testCodec.decrypt(value);
+      },
+    },
+    env: {},
+  });
+  writeFileSync(
+    path.join(root, "agent-provider.secrets.json"),
+    JSON.stringify({ version: 1, apiKey: Buffer.from("sealed:old-key").toString("base64") }),
+  );
+
+  assert.equal(store.snapshot().configured, false);
+  assert.equal(store.snapshot().hasApiKey, false);
+  assert.equal(store.runtimeConfiguration().apiKey, undefined);
+  assert.equal(decryptCalls, 0);
+});
+
+test("settings snapshots and startup runtime never decrypt a stored key", (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "skill-recorder-settings-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  let decryptCalls = 0;
+  const store = new AgentSettingsStore({
+    configPath: path.join(root, "agent-provider.json"),
+    secretPath: path.join(root, "agent-provider.secrets.json"),
+    codec: {
+      ...testCodec,
+      decrypt: (value) => {
+        decryptCalls += 1;
+        return testCodec.decrypt(value);
+      },
+    },
+    env: {},
+  });
+  store.save({
+    provider: "openai-compatible",
+    baseUrl: "https://model.example/v1",
+    model: "vision-model",
+    vision: true,
+    apiKey: "stored-key",
+  });
+  decryptCalls = 0;
+
+  assert.equal(store.snapshot().hasApiKey, true);
+  assert.equal(store.runtimeConfiguration({ includeSecureKey: false }).apiKey, undefined);
+  assert.equal(decryptCalls, 0);
+  assert.equal(store.runtimeConfiguration().apiKey, "stored-key");
+  assert.equal(decryptCalls, 1);
 });
 
 test("an invalid hand-edited file reports an error without replacing the active config", (t) => {

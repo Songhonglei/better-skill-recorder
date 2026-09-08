@@ -11,6 +11,7 @@ import type {
   TargetPlacement,
 } from "./skill";
 import type { RecorderState } from "./types";
+import type { AppSettings } from "./app-settings";
 import type {
   AgentProviderRevealResult,
   AgentProviderSettings,
@@ -402,37 +403,10 @@ export interface DebugBundleResult {
   error?: string;
 }
 
-export interface CopilotInfo {
-  ok: boolean;
-  path: string | null;
-}
-
-/** Result of asking the app to open a terminal on the bundled CLI's sign-in command. */
-export interface CopilotSignInResult {
-  ok: boolean;
-  /** The exact command the terminal was asked to run, so the user can run it themselves. */
-  command?: string;
-  error?: string;
-}
-
-/**
- * Message every Copilot-backed feature throws when the CLI has no stored credentials.
- * Skill Recorder ships its own Copilot CLI in `node_modules`, so there is usually no
- * global `copilot` command to run — the renderer matches this message to offer the
- * in-app sign-in affordance instead.
- */
-export const COPILOT_SIGNED_OUT_ERROR =
-  "GitHub Copilot isn't signed in on this computer yet. Sign in below, then try again.";
-
-/** Whether an error from a Copilot-backed feature means "no credentials yet". */
-export function isCopilotSignedOutError(error?: string | null): boolean {
-  return typeof error === "string" && error.includes("isn't signed in on this computer");
-}
-
 /** Which foreground-window provider is available on this platform. */
 export interface ActiveWindowInfo {
   ok: boolean;
-  provider: "koffi" | "get-windows" | "missing";
+  provider: "macos-native" | "missing";
   path: string | null;
   error?: string;
 }
@@ -457,7 +431,6 @@ export interface DoctorSource {
 
 export interface DoctorReport {
   platform: NodeJS.Platform;
-  copilotCli: CopilotInfo;
   activeWindow: ActiveWindowInfo;
   browserUrl: BrowserUrlInfo;
   sessionsDir: string;
@@ -477,12 +450,17 @@ export const IPC = {
   microphoneDevice: "microphone:device",
   microphoneSettingsChanged: "microphone:settings-changed",
   screenSettings: "screen:settings",
+  screenPermissions: "screen:permissions",
+  shortcutStatus: "shortcut:status",
+  appSettings: "app:settings",
+  appSettingsSave: "app:settings-save",
+  shortcutRetry: "shortcut:retry",
+  shortcutCapture: "shortcut:capture",
   screenSource: "screen:source",
   screenSettingsChanged: "screen:settings-changed",
   status: "recorder:status",
   marker: "recorder:marker",
   doctor: "doctor:check",
-  copilotSignIn: "copilot:sign-in",
   statusChanged: "recorder:status-changed",
   recordingPrivacyReviewed: "recorder:privacy-reviewed",
   recordingPrivacyWarningRequested: "recorder:privacy-warning-requested",
@@ -549,6 +527,12 @@ export interface SkillRecorderApi {
     cb: (status: MicrophoneSettingsStatus) => void,
   ): () => void;
   screenSettings(): Promise<ScreenSettingsStatus>;
+  screenPermissions(): Promise<void>;
+  shortcutStatus(): Promise<boolean>;
+  appSettings(): Promise<AppSettings>;
+  appSettingsSave(input: AppSettings): Promise<{ ok: boolean; settings?: AppSettings; error?: string }>;
+  shortcutRetry(): Promise<boolean>;
+  shortcutCapture(active: boolean): Promise<void>;
   selectScreen(sourceId: string): Promise<ScreenSettingsResult>;
   onScreenSettingsChanged(
     cb: (status: ScreenSettingsStatus) => void,
@@ -556,11 +540,6 @@ export interface SkillRecorderApi {
   status(): Promise<RecorderStatus>;
   marker(note: string): Promise<MarkerResult>;
   doctor(): Promise<DoctorReport>;
-  /**
-   * Open a terminal window running the bundled Copilot CLI's `login` command, so the
-   * user can sign in without a globally installed `copilot`.
-   */
-  copilotSignIn(): Promise<CopilotSignInResult>;
   onStatusChanged(cb: (status: RecorderStatus) => void): () => void;
   narrationStatus(): Promise<NarrationStatus>;
   downloadNarrationModel(): Promise<NarrationActionResult>;

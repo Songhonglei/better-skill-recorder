@@ -1,233 +1,124 @@
-# Releasing Skill Recorder
+# Release Better Skill Recorder
 
-Skill Recorder uses semantic versions and two distinct release channels:
+The current release channel is a **macOS Apple Silicon unsigned preview**. Do not describe
+it as signed, notarized, verified by Apple, or suitable for managed production devices.
 
-1. **Source-only releases** are the default. GitHub publishes the tagged
-   repository source, and users build an exact commit locally with the
-   commit-pinned installers.
-2. **Binary releases** are optional. They must be built with the repository's
-   `npm run dist*` commands and accompanied by the complete, version-matched
-   compliance bundle.
+## 1. Prepare the release commit
 
-Never attach `dist/`, `dist-electron/`, `node_modules/`, or an application
-assembled by `install.ps1` or `install.sh` to a release.
+Start from `main` with a clean working tree. Update the semantic version in
+`package.json` and `package-lock.json`:
 
-## 1. Prepare a release pull request
-
-Start from the latest `main` and choose the next semantic version:
-
-- patch (`0.1.1`) for compatible fixes;
-- minor (`0.2.0`) for compatible functionality;
-- major (`1.0.0`) for incompatible behavior after the project reaches 1.0.
-
-Update both `package.json` and `package-lock.json` without creating a tag:
-
-```sh
-npm version 0.2.0 --no-git-tag-version
+```bash
+npm version 0.1.0-preview.1 --no-git-tag-version
 ```
 
-Replace `0.2.0` with the chosen version. Summarize user-visible changes in the
-pull request. If dependencies or bundled assets changed, perform the review
-below before updating any compliance policy hash.
+Update `CHANGELOG.md`, screenshots, README compatibility notes, model presets, and
+third-party notices when relevant.
 
-### Dependency and asset review
+## 2. Verify the toolchain
 
-Run:
+Required release toolchain:
 
-```sh
-npm run fix:lockfile-registry
+- Node.js `>=24.19.0 <25`
+- npm `>=11.17.0`
+- Apple Silicon macOS runner or build machine
+
+The npm minimum is intentional. Release installation uses npm's install-script allowlist
+enforcement so an unreviewed dependency lifecycle script cannot silently execute.
+
+```bash
+node --version
+npm --version
 npm run check:lockfile
-npm ci --ignore-scripts=false --dangerously-allow-all-scripts=false --strict-allow-scripts
-npm run compliance:licenses
 ```
 
-Inspect:
+Do not bypass or weaken the install-script policy to make a release.
 
-- `.compliance/LICENSE-INVENTORY.json`;
-- `.compliance/THIRD-PARTY-LICENSES.txt`;
-- `THIRD-PARTY-NOTICES.md`;
-- changes to `package-lock.json`;
-- the exact-version approvals and explicit denials in `package.json#allowScripts`;
-- every new or changed image, font, model, native library, executable, and
-  copied source file.
+## 3. Install and validate
 
-The committed lockfile must use canonical `registry.npmjs.org` resolved URLs.
-Microsoft contributors may fetch through a configured internal mirror, but
-internal feed URLs must never be committed. Review every new dependency install
-script before adding an exact-version approval; explicitly deny scripts that
-are not required.
-
-The compliance scripts intentionally reject unreviewed component versions and
-materials. Do not fix such a failure by blindly replacing a version or hash.
-Review the new license, notices, redistribution terms, corresponding-source
-requirements, and upstream provenance first.
-
-| Change | Required review |
-| --- | --- |
-| GitHub Copilot SDK or CLI | Re-read that exact version's terms and notices; confirm unmodified bundling remains permitted; update the reviewed policy version. |
-| Electron or Chromium | Review the Electron archive and checksums, Chromium notices, FFmpeg revision/source/patches, and every supported platform hash. |
-| Sharp or sharp-libvips | Review package licenses, native dependency versions, build repositories, patches, source archives, and relinking instructions. |
-| ONNX Runtime | Review the exact release/development revision, license, notices, native packages, and source reference. |
-| Tesseract.js, Tesseract.js-core, or tessdata | Review the exact npm versions, WASM build commit and submodules, embedded-library notices, language-data commit/hash, and fixed source archives. |
-| Artistic-2.0 package | Retain the package notice and complete Artistic-2.0 text; include valid source instructions or the exact Standard Version source. |
-| New native or copyleft component | Add exact notices, canonical license text, complete corresponding source, build scripts/patches, and relinking instructions where required. |
-| Font, image, model, recording, or other asset | Record its provenance and written redistribution authorization; do not assume application code licenses cover assets. |
-
-If a new obligation cannot be met, do not merge or release the dependency.
-
-## 2. Validate the release candidate
-
-Run the existing checks:
-
-```sh
+```bash
+npm ci --ignore-scripts=false --dangerously-allow-all-scripts=false --strict-allow-scripts
+npm run assets:prepare
+npm run compliance:prepare
+npm run typecheck
+npm run typecheck:evals
 npm test
 npm run build
-npm run typecheck:evals
-npm run compliance:licenses
+npm audit --omit=dev
 ```
 
-For a binary candidate, also generate the full bundle:
+Review dependency and lockfile changes, `package.json#allowScripts`, the generated license
+inventory, third-party notices, and every new model, image, font, native binary, and copied
+source file. The English OCR model must match the commit and SHA-256 pinned in
+`third_party/compliance-policy.json`.
 
-```sh
-npm run compliance:prepare
+## 4. Build the unsigned preview
+
+Build on Apple Silicon and explicitly disable identity discovery:
+
+```bash
+CSC_IDENTITY_AUTO_DISCOVERY=false npm run dist:portable:mac
+shasum -a 256 release/*.zip | tee release/SHA256SUMS.txt
 ```
 
-The pull request must pass:
+Verify the app and expected preview status:
 
-- Windows x64 and ARM64 license, test, build, package, and architecture checks;
-- macOS full corresponding-source preparation, test, and build checks;
-- Ubuntu license, test, and build checks;
-- commit-pinned source-installer checks on Windows, macOS, and Ubuntu.
-
-Resolve every compliance failure. Never disable or bypass a compliance check to
-publish a release.
-
-## 3. Merge and freeze the release commit
-
-Merge the release pull request into `main`, then wait for the workflows on
-the resulting `main` commit to pass. Record the exact commit:
-
-```sh
-git fetch origin main
-release_commit="$(git rev-parse origin/main)"
-printf '%s\n' "$release_commit"
+```bash
+codesign --verify --deep --strict --verbose=2 \
+  "release/mac-arm64/Better Skill Recorder.app"
+spctl --assess --type execute --verbose=4 \
+  "release/mac-arm64/Better Skill Recorder.app" || true
 ```
 
-The release tag and every installation command must identify this commit. Do
-not use a branch name or a mutable tag in an installer command.
+`codesign --verify` should accept the internal ad-hoc signature. `spctl` is expected to
+reject the preview because it has no Apple Developer ID and notarization ticket.
 
-Create an annotated tag only after the commit passes:
+## 5. Clean-machine acceptance test
 
-```sh
-version="v0.2.0"
-git tag -a "$version" "$release_commit" -m "Skill Recorder $version"
-git push origin "$version"
+Test the exact ZIP on a Mac without existing Better Skill Recorder state:
+
+1. Verify SHA-256 and follow the documented Gatekeeper **Open Anyway** flow
+2. Grant Screen Recording and optionally Microphone access
+3. Configure a model and test the connection
+4. Record a short browser workflow
+5. Analyze with visual analysis on and off
+6. Export both share-safe and personal Skills
+7. Confirm the share-safe package contains no API key, local absolute path, or local ID
+8. Replace the app with the candidate again and verify settings and sessions survive
+
+Also test invalid API keys, unreachable endpoints, unsupported model capabilities,
+cancelled analysis, and denied macOS permissions.
+
+## 6. Tag and publish
+
+Production releases require CI and the clean-machine test. An explicitly labeled
+prerelease may be shared for external acceptance testing after local checks pass;
+its notes must disclose which clean-machine tests are still pending:
+
+```bash
+release_commit="$(git rev-parse HEAD)"
+git tag -a v0.1.0-preview.1 "$release_commit" -m "Preview V0.1.0"
+git push origin HEAD:main refs/tags/v0.1.0-preview.1
 ```
 
-Do not move or reuse a published tag. Protect release tags in repository
-settings. If a release is defective, publish a new patch version.
+Attach the macOS ARM64 ZIP and `SHA256SUMS.txt`. The app includes version-matched
+license notices, immutable upstream source URLs, hashes and build instructions in
+`Contents/Resources/compliance`; the current network-source policy does not require a
+separate `compliance-sources.zip`. Never substitute a licenses-only bundle.
+Release notes must prominently state **Unsigned Preview — not notarized by
+Apple**, Apple Silicon only, the exact commit and checksum, model requirements, known
+limitations, and a link to `INSTALL.md`.
 
-## 4. Calculate installer-script hashes
+Never silently replace an asset or move a published tag. Publish a new patch version.
 
-Calculate hashes from the exact release commit's Git blobs, not working-tree
-files. This avoids stale checkouts and local line-ending conversion. Replace
-the final argument with the full 40-character release commit SHA. The command
-works in PowerShell, macOS, and Ubuntu:
+## 7. Future Developer ID release
 
-```sh
-node -e 'const {execFileSync}=require("node:child_process");const {createHash}=require("node:crypto");const commit=process.argv[1];if(!/^[0-9a-f]{40}$/i.test(commit))throw new Error("full release commit SHA required");for(const file of ["install.ps1","install.sh"]){const data=execFileSync("git",["cat-file","blob",commit+":"+file]);console.log(createHash("sha256").update(data).digest("hex")+"  "+file)}' FULL_40_CHARACTER_RELEASE_COMMIT_SHA
-```
+Before removing the unsigned-preview warning, implement and verify:
 
-Publish both hashes in the GitHub Release notes. A user following the
-inspect-first instructions in `INSTALL.md` must be able to compare the
-downloaded script with these values.
+- Apple Developer Program membership
+- Developer ID Application certificate and protected CI secret
+- Hardened Runtime and least-privilege entitlements
+- notarization with `notarytool` and ticket stapling
+- `spctl` acceptance on a clean Mac
 
-## 5. Publish the source-only GitHub Release
-
-Source-only is the recommended release format. Do not attach installers or
-portable binaries. GitHub's automatically generated archives contain the
-tagged repository source but not `node_modules` or downloaded runtimes.
-
-Release notes must include:
-
-- version and full release commit SHA;
-- SHA-256 values for `install.ps1` and `install.sh`;
-- user-visible changes;
-- the commit-pinned Windows and macOS/Ubuntu commands from `INSTALL.md`;
-- a clear statement that the release is source-only;
-- important upgrade, security, or compatibility notes.
-
-After preparing a notes file:
-
-```sh
-gh release create "v0.2.0" \
-  --verify-tag \
-  --title "Skill Recorder v0.2.0" \
-  --notes-file release-notes.txt
-```
-
-Do not commit the temporary release-notes file.
-
-## 6. Optional binary release
-
-Binary publication is a separate decision. The supported release targets are
-**Windows x64**, **Windows ARM64**, and **macOS arm64**; every other platform,
-including Linux and macOS x64, is a source install (see `INSTALL.md`). The
-compliance tooling refuses to prepare a redistributable bundle on an
-unsupported target.
-
-Build each artifact on its native operating system and architecture:
-
-```sh
-npm ci
-npm run dist
-npm run dist:win:x64
-npm run dist:win:arm64
-npm run dist:portable:mac
-npm run dist:portable:win
-```
-
-Run only the command applicable to that native machine. Outputs are written to
-`release/`. The build must complete the `afterPack` compliance gate.
-
-Before attaching a binary:
-
-1. Confirm it was built from the tagged commit with an unchanged lockfile.
-2. Verify its operating-system and CPU architecture.
-3. Confirm `resources/compliance/` contains exact notices, legal texts,
-   corresponding source, patches, hashes, and relinking instructions.
-4. Archive the generated `.compliance` directory as a separate companion asset.
-5. Attach the binary and its matching compliance archive to the same release.
-6. Publish SHA-256 values for every attached asset.
-7. Preserve the compliance archive for as long as the binary remains available.
-8. Disclose whether the binary is unsigned, ad-hoc signed, or Authenticode /
-   Developer ID signed.
-
-The manual **Portable builds** workflow produces unsigned preview artifacts and
-matching compliance artifacts. Download and verify them before deciding to
-publish them. An Actions artifact is not itself a GitHub Release.
-
-## 7. Post-release verification
-
-On clean supported machines:
-
-1. Download each installer script by the full release commit SHA.
-2. Compare its SHA-256 with the release notes.
-3. Run with `SKILL_RECORDER_NO_LAUNCH=1`.
-4. Confirm dependency installation and the platform license inventory succeed.
-5. Launch Skill Recorder and exercise recording, analysis, and skill creation.
-6. Confirm update and uninstall instructions in `INSTALL.md`.
-
-Check that the GitHub Release tag still resolves to the recorded commit and
-that all source archives, hashes, notes, and optional compliance assets remain
-available.
-
-## 8. Correcting a published release
-
-Never silently replace an asset or move a release tag.
-
-- For incorrect notes, edit the notes and document the correction.
-- For a defective script, dependency, compliance bundle, or binary, mark the
-  affected release as unsuitable and publish a new patch release.
-- If an asset creates a legal or security risk, remove the affected binary,
-  retain an audit record, and publish corrected materials under a new version.
+The local certificate created by `npm run setup:signing:mac` cannot be used for this.

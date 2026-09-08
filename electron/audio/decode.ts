@@ -1,8 +1,11 @@
 import { randomUUID } from "node:crypto";
+import { readBoundedAudio } from "./bounded-read";
+import { stat } from "node:fs/promises";
+import { appSettings } from "../app-settings";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { BrowserWindow, ipcMain, type IpcMainEvent } from "electron";
+import { app, dialog, BrowserWindow, ipcMain, type IpcMainEvent } from "electron";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const SAMPLE_RATE = 16_000;
@@ -12,6 +15,22 @@ const DECODE_TIMEOUT_MS = 10 * 60_000;
 
 /** Decode and downmix a WebM narration file through Chromium's built-in codecs. */
 export async function decodeAudioFile(audioPath: string): Promise<Float32Array> {
+  const maximumMB = appSettings().maximumAudioMB;
+  const MAX_ENCODED_BYTES = maximumMB * 1024 * 1024;
+  const info = await stat(audioPath);
+  if (info.size > MAX_ENCODED_BYTES) {
+    const zh = app.getLocale().startsWith("zh");
+    const message = zh ? `音频超过 ${maximumMB} MB，已停止读取` : `Audio exceeds ${maximumMB} MB — reading stopped`;
+    const detail = zh ? `请先压缩或切割音频，或在高级设置中调整上限\n原文件保持不变\n\n${audioPath}` : `Compress or split the audio, or adjust the limit in Advanced settings\nThe original file is unchanged\n\n${audioPath}`;
+    await dialog.showMessageBox({ type: "warning", message, detail, buttons: [zh ? "知道了" : "OK"] });
+    throw new Error(`${message}\n${detail}`);
+  }
+  const encoded = await readBoundedAudio(audioPath, MAX_ENCODED_BYTES);
+  if (encoded.byteLength === 0 || encoded.byteLength > MAX_ENCODED_BYTES) {
+    throw new Error(
+      `Narration audio size is invalid: ${encoded.byteLength} bytes.`,
+    );
+  }
   const id = randomUUID();
   const win = new BrowserWindow({
     show: false,
@@ -19,7 +38,7 @@ export async function decodeAudioFile(audioPath: string): Promise<Float32Array> 
       preload: path.join(dirname, "audio", "capture-preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
       backgroundThrottling: false,
     },
   });
@@ -48,7 +67,7 @@ export async function decodeAudioFile(audioPath: string): Promise<Float32Array> 
 
     const onMeta = (event: IpcMainEvent, jobId: string, length: number) => {
       if (!owns(event, jobId)) return;
-      if (!Number.isSafeInteger(length) || length <= 0 || length > MAX_SAMPLES) {
+      if (samples || !Number.isSafeInteger(length) || length <= 0 || length > MAX_SAMPLES) {
         finish(new Error(`Decoded narration length is invalid: ${length}.`));
         return;
       }
@@ -61,7 +80,7 @@ export async function decodeAudioFile(audioPath: string): Promise<Float32Array> 
       chunk: Float32Array,
     ) => {
       if (!owns(event, jobId) || !samples || !(chunk instanceof Float32Array)) return;
-      if (!Number.isSafeInteger(offset) || offset < 0 || offset + chunk.length > samples.length) {
+      if (!Number.isSafeInteger(offset) || offset !== received || chunk.length > CHUNK_SAMPLES || offset + chunk.length > samples.length) {
         finish(new Error("Audio decoder returned an out-of-range sample chunk."));
         return;
       }
@@ -97,7 +116,11 @@ export async function decodeAudioFile(audioPath: string): Promise<Float32Array> 
       .then(() => {
         win.webContents.send("audio:decode", {
           id,
-          audioPath,
+          encoded: new Uint8Array(
+            encoded.buffer,
+            encoded.byteOffset,
+            encoded.byteLength,
+          ),
           sampleRate: SAMPLE_RATE,
           chunkSamples: CHUNK_SAMPLES,
         });

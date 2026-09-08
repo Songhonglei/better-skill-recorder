@@ -1,9 +1,9 @@
-import { CopilotAgentRuntime } from "../agent-runtime/copilot-runtime";
 import type {
   AgentRuntime,
   AgentSession,
   AgentSessionOptions,
 } from "../agent-runtime/types";
+import { createAnalyzeRuntime } from "../agent-runtime/runtime-factory";
 import { createLogger } from "../logger";
 
 /**
@@ -26,12 +26,14 @@ export abstract class AgentBuilder<TLive extends BaseLive> {
   protected readonly live = new Map<string, TLive>();
   protected readonly active = new Set<string>();
   protected readonly log;
+  private runtime: AgentRuntime;
 
   constructor(
     name: string,
-    private runtime: AgentRuntime = new CopilotAgentRuntime(name),
+    runtime?: AgentRuntime,
   ) {
     this.log = createLogger(name);
+    this.runtime = runtime ?? createAnalyzeRuntime(name);
   }
 
   isBuilding(sessionId: string): boolean {
@@ -111,9 +113,7 @@ export abstract class AgentBuilder<TLive extends BaseLive> {
     if (this.runtimeReady) return this.runtimeReady;
     this.runtimeReady = (async () => {
       const status = await this.runtime.checkConnection();
-      this.model = this.runtime.id === "copilot"
-        ? process.env.SKILL_RECORDER_MODEL || undefined
-        : (await this.runtime.listModels?.())?.find((candidate) => candidate.enabled)?.id;
+      this.model = (await this.runtime.listModels?.())?.find((candidate) => candidate.enabled)?.id;
       this.log.info(
         `${this.runtime.id} ready`,
         status.login ? `as ${status.login}` : "",

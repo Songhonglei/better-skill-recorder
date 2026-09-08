@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import {
   findLocalSigningIdentity,
   LOCAL_MACOS_SIGNING_IDENTITY,
+  shouldUseAdHocSignature,
 } from "./macos-signing.mjs";
 
 const builder = fileURLToPath(
@@ -18,12 +19,12 @@ let temporaryConfig;
 
 if (process.platform === "darwin") {
   const identityHash = findLocalSigningIdentity();
-  const allowAdHoc =
-    process.env.CI === "true" ||
-    process.env.CSC_IDENTITY_AUTO_DISCOVERY === "false" ||
-    process.env.BETTER_SKILL_RECORDER_ALLOW_ADHOC === "1";
+  const allowAdHoc = shouldUseAdHocSignature();
 
-  if (identityHash) {
+  if (allowAdHoc) {
+    console.warn("Using the explicitly requested ad-hoc macOS signature.");
+    args.push("--config.mac.identity=-");
+  } else if (identityHash) {
     console.log(
       `Signing macOS build with ${LOCAL_MACOS_SIGNING_IDENTITY} (${identityHash.slice(0, 12)}…).`,
     );
@@ -42,11 +43,6 @@ if (process.platform === "darwin") {
       mode: 0o600,
     });
     args.push("--config", temporaryConfig);
-  } else if (allowAdHoc) {
-    console.warn(
-      "Local signing identity not found; using the explicitly allowed ad-hoc signature.",
-    );
-    args.push("--config.mac.identity=-");
   } else {
     console.error(
       `Missing macOS signing identity \"${LOCAL_MACOS_SIGNING_IDENTITY}\".\n` +
