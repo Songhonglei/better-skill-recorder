@@ -42,6 +42,32 @@ with sync_playwright() as p:
     page.goto(base, wait_until='networkidle')
     page.keyboard.press('Tab')
     assert page.locator('.skip').evaluate('(e)=>e===document.activeElement')
+    for filename in ['index.html', 'en.html']:
+        page = context.new_page()
+        page.clock.install()
+        page.goto(f'{base}/{filename}', wait_until='networkidle')
+        page.mouse.move(0, 0)
+        page.clock.run_for(2600)
+        assert page.locator('.hero-carousel').get_attribute('data-active') == '1'
+        page.locator('.hero-carousel').hover()
+        page.clock.run_for(6000)
+        assert page.locator('.hero-carousel').get_attribute('data-active') == '1'
+        page.mouse.move(0, 0)
+        page.clock.run_for(2600)
+        assert page.locator('.hero-carousel').get_attribute('data-active') == '0'
+        page.locator('.carousel-toggle').click()
+        page.mouse.move(0, 0)
+        page.locator('.carousel-toggle').evaluate('(el)=>el.blur()')
+        page.clock.run_for(6000)
+        assert page.locator('.hero-carousel').get_attribute('data-active') == '0'
+        page.locator('[data-go="1"]').click()
+        assert page.locator('[data-slide="0"]').get_attribute('inert') is not None
+        print(f'PASS {filename}: carousel timing, hover pause/resume, manual controls')
+    reduced = browser.new_page(reduced_motion='reduce')
+    reduced.goto(base, wait_until='networkidle')
+    reduced.clock.install()
+    reduced.clock.run_for(6000)
+    assert reduced.locator('.hero-carousel').get_attribute('data-active') == '0'
     assert not errors, errors
     browser.close()
 print('PASS language round-trip, anchor preservation, clipboard fallback and keyboard entry')

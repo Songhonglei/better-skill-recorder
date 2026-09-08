@@ -27,15 +27,35 @@ as a share-safe Skill or a personal Skill containing local configuration.
 > Current platform: **macOS on Apple Silicon (ARM64)**. Windows, Linux, and Intel Mac
 > installers are not yet supported.
 
-<p align="center">
-  <img src="docs/images/recorder.png" alt="Better Skill Recorder capture window" width="420">
-  &nbsp;&nbsp;
-  <img src="docs/images/library.png" alt="Better Skill Recorder sessions window" width="520">
-</p>
+## Interface gallery
 
-Current Preview V0.1.0 renderer, captured with synthetic demo settings and an empty
-recording library. No personal recordings or API keys are included. See the
-[interface gallery](docs/SCREENSHOTS.md) for model management and advanced settings.
+<table>
+<tr>
+<td width="50%" align="center"><a href="docs/images/en/recorder-light.png"><img src="docs/images/en/recorder-light.png" alt="Recorder · light" width="600"></a><br><sub>Recorder · light</sub></td>
+<td width="50%" align="center"><a href="docs/images/en/recorder-dark.png"><img src="docs/images/en/recorder-dark.png" alt="Recorder · dark" width="600"></a><br><sub>Recorder · dark</sub></td>
+</tr>
+<tr>
+<td width="50%" align="center"><a href="docs/images/en/library-light.png"><img src="docs/images/en/library-light.png" alt="Recordings · weekly update · light" width="600"></a><br><sub>Recordings · weekly update · light</sub></td>
+<td width="50%" align="center"><a href="docs/images/en/library-dark.png"><img src="docs/images/en/library-dark.png" alt="Recordings · weekly update · dark" width="600"></a><br><sub>Recordings · weekly update · dark</sub></td>
+</tr>
+<tr>
+<td width="50%" align="center"><a href="docs/images/en/library-example-light.png"><img src="docs/images/en/library-example-light.png" alt="Recordings · product comparison · light" width="600"></a><br><sub>Recordings · product comparison · light</sub></td>
+<td width="50%" align="center"><a href="docs/images/en/library-example-dark.png"><img src="docs/images/en/library-example-dark.png" alt="Recordings · product comparison · dark" width="600"></a><br><sub>Recordings · product comparison · dark</sub></td>
+</tr>
+<tr>
+<td width="50%" align="center"><a href="docs/images/en/model-management-light.png"><img src="docs/images/en/model-management-light.png" alt="Model management · light" width="600"></a><br><sub>Model management · light</sub></td>
+<td width="50%" align="center"><a href="docs/images/en/model-management-dark.png"><img src="docs/images/en/model-management-dark.png" alt="Model management · dark" width="600"></a><br><sub>Model management · dark</sub></td>
+</tr>
+<tr>
+<td width="50%" align="center"><a href="docs/images/en/advanced-settings-light.png"><img src="docs/images/en/advanced-settings-light.png" alt="Advanced settings · light" width="600"></a><br><sub>Advanced settings · light</sub></td>
+<td width="50%" align="center"><a href="docs/images/en/advanced-settings-dark.png"><img src="docs/images/en/advanced-settings-dark.png" alt="Advanced settings · dark" width="600"></a><br><sub>Advanced settings · dark</sub></td>
+</tr>
+</table>
+
+Preview V0.1.0 in light and dark themes. All recordings and analysis results shown
+are fictional examples rendered in the real interface, not personal data or model
+test results. Click an image to view it at full size.
+[Chinese gallery and reproduction guide](docs/SCREENSHOTS.md)
 
 ## Highlights
 

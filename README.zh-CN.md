@@ -20,11 +20,32 @@
 
 ## 界面预览
 
-![录制页面](docs/images/recorder.png)
+<table>
+<tr>
+<td width="50%" align="center"><a href="docs/images/zh-CN/recorder-light.png"><img src="docs/images/zh-CN/recorder-light.png" alt="录制 · 浅色" width="600"></a><br><sub>录制 · 浅色</sub></td>
+<td width="50%" align="center"><a href="docs/images/zh-CN/recorder-dark.png"><img src="docs/images/zh-CN/recorder-dark.png" alt="录制 · 深色" width="600"></a><br><sub>录制 · 深色</sub></td>
+</tr>
+<tr>
+<td width="50%" align="center"><a href="docs/images/zh-CN/library-light.png"><img src="docs/images/zh-CN/library-light.png" alt="录制记录 · 周报示例 · 浅色" width="600"></a><br><sub>录制记录 · 周报示例 · 浅色</sub></td>
+<td width="50%" align="center"><a href="docs/images/zh-CN/library-dark.png"><img src="docs/images/zh-CN/library-dark.png" alt="录制记录 · 周报示例 · 深色" width="600"></a><br><sub>录制记录 · 周报示例 · 深色</sub></td>
+</tr>
+<tr>
+<td width="50%" align="center"><a href="docs/images/zh-CN/library-example-light.png"><img src="docs/images/zh-CN/library-example-light.png" alt="录制记录 · 产品对比 · 浅色" width="600"></a><br><sub>录制记录 · 产品对比 · 浅色</sub></td>
+<td width="50%" align="center"><a href="docs/images/zh-CN/library-example-dark.png"><img src="docs/images/zh-CN/library-example-dark.png" alt="录制记录 · 产品对比 · 深色" width="600"></a><br><sub>录制记录 · 产品对比 · 深色</sub></td>
+</tr>
+<tr>
+<td width="50%" align="center"><a href="docs/images/zh-CN/model-management-light.png"><img src="docs/images/zh-CN/model-management-light.png" alt="模型管理 · 浅色" width="600"></a><br><sub>模型管理 · 浅色</sub></td>
+<td width="50%" align="center"><a href="docs/images/zh-CN/model-management-dark.png"><img src="docs/images/zh-CN/model-management-dark.png" alt="模型管理 · 深色" width="600"></a><br><sub>模型管理 · 深色</sub></td>
+</tr>
+<tr>
+<td width="50%" align="center"><a href="docs/images/zh-CN/advanced-settings-light.png"><img src="docs/images/zh-CN/advanced-settings-light.png" alt="高级设置 · 浅色" width="600"></a><br><sub>高级设置 · 浅色</sub></td>
+<td width="50%" align="center"><a href="docs/images/zh-CN/advanced-settings-dark.png"><img src="docs/images/zh-CN/advanced-settings-dark.png" alt="高级设置 · 深色" width="600"></a><br><sub>高级设置 · 深色</sub></td>
+</tr>
+</table>
 
-[查看模型管理、录制记录与高级设置截图](docs/SCREENSHOTS.md)
-
-截图基于当前版本界面与虚构示例配置生成，不包含真实用户数据
+Preview V0.1.0 浅色与深色界面，点击图片可查看大图
+录制记录和分析结果均为虚构示例，使用真实界面渲染，不含个人数据，也不代表模型实测结果
+[英文画廊与截图生成说明](docs/SCREENSHOTS.md)
 
 ## 安装与开始使用
 

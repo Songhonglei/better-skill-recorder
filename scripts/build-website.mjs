@@ -36,13 +36,23 @@ for (const [locale, c] of Object.entries(content)) {
         <p class="caption">${c.platform}</p>
         <ul class="feature-list">${c.features.map(f => `<li>${f}</li>`).join('')}</ul>
       </div>
-      <div class="workflow-demo">
+      <section class="hero-carousel" aria-label="${locale === 'zh' ? '产品展示' : 'Product showcase'}" aria-roledescription="${locale === 'zh' ? '轮播' : 'carousel'}">
+      <div class="carousel-stage">
+      <div class="brand-slide carousel-slide" data-slide="0" role="group" aria-label="${locale === 'zh' ? '1 / 2：品牌视觉' : '1 of 2: Brand visual'}">
+        <div class="brand-slide-top"><span>WORKFLOW / 01</span><span>● CAPTURE</span></div>
+        <span class="pulse large" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></span>
+        <div class="brand-slide-bottom"><h2>${locale === 'zh' ? '让经验可以被复用' : 'Make your know-how reusable'}</h2><p>${locale === 'zh' ? '真实操作　→　有序步骤　→　SKILL' : 'REAL WORK　→　CLEAR STEPS　→　SKILL'}</p></div>
+      </div>
+      <div class="workflow-demo carousel-slide" data-slide="1" role="group" aria-label="${locale === 'zh' ? '2 / 2：一个小例子' : '2 of 2: A simple example'}" aria-hidden="true" inert>
         <div class="demo-heading"><span class="record-dot" aria-hidden="true"></span><span>${c.example}</span><span class="demo-time">00:28</span></div>
         <h2>${c.exampleName}</h2>
         <div class="voice"><span class="wave" aria-hidden="true">▂ ▅ ▃ ▇ ▄ ▂ ▆ ▃</span><p>${c.narration}</p><small>${c.input}</small></div>
         <div class="generated"><div class="generated-heading"><span aria-hidden="true">↳</span> ${c.output}<span class="file-tag">SKILL.md</span></div><ol>${c.sampleSteps.map(s => `<li>${s}</li>`).join('')}</ol></div>
         <p class="demo-caption">${c.exampleNote}</p>
       </div>
+      </div>
+      <div class="carousel-controls"><button type="button" class="slide-dot" data-go="0" aria-current="true" aria-label="${locale === 'zh' ? '显示品牌视觉' : 'Show brand visual'}"></button><button type="button" class="slide-dot" data-go="1" aria-label="${locale === 'zh' ? '显示一个小例子' : 'Show example'}"></button><button type="button" class="carousel-toggle" data-pause="${locale === 'zh' ? '暂停轮播' : 'Pause slideshow'}" data-play="${locale === 'zh' ? '播放轮播' : 'Play slideshow'}">${locale === 'zh' ? '暂停轮播' : 'Pause slideshow'}</button></div>
+      </section>
     </section>
     <section class="section wrap" id="start">
       <div class="section-heading"><p class="eyebrow">RECORD → REVIEW → EXPORT</p><h2>${c.flowTitle}</h2><p>${c.flowSub}</p></div>
