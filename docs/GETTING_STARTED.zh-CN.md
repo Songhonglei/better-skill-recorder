@@ -5,7 +5,7 @@
 ## 下载与安装
 
 - [下载 Preview V0.1.0](https://github.com/Songhonglei/better-skill-recorder/releases/tag/preview-v0.1.0)
-- 仅支持 Apple Silicon Mac（M 系列），不提供 Intel Mac、Windows 或 Linux 安装包
+- 当前支持 Apple Silicon Mac（M 系列），Intel Mac / Windows / Linux 安装包暂未支持
 - 普通用户不需要 Node、npm 或 GitHub Copilot；这些开发工具不是安装前提
 - 这是 **Unsigned Preview**：采用临时签名，未经 Apple Developer ID 签名和公证，尚未完成独立干净 Mac 的全流程验收
 
@@ -17,6 +17,8 @@
 不要关闭系统整体 Gatekeeper，不要执行来源不明的安全绕过命令。受管理的电脑如不允许放行，请联系管理员。参见 [Apple 官方说明](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac)
 
 ## 第一次使用
+
+也可以使用 [Agent 安装提示词](AGENT_INSTALL.md)协助下载、校验和安装；系统授权和密钥输入由你确认。[查看当前界面](SCREENSHOTS.md)
 
 ### 1 · 授予权限
 

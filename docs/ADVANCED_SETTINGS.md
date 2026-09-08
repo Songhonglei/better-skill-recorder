@@ -1,5 +1,7 @@
 # 高级设置
 
+[English](#advanced-settings-english) · [当前界面 / Current UI](SCREENSHOTS.md#advanced-settings--高级设置)
+
 会话库左侧的“高级设置”是应用全局选项入口，沿用模型管理的青绿主题、字体与底部保存栏
 
 | 选项 | 默认 | 范围 | 生效方式 |
@@ -22,3 +24,28 @@
 参考：[Apple 快捷键](https://support.apple.com/en-us/102650)、[Chrome 快捷键](https://support.google.com/chrome/answer/157179)。名单是本应用的保守保护策略，不承诺发现所有第三方自定义快捷键
 
 后续可考虑：磁盘限额、默认屏幕/麦克风、通知偏好、诊断日志级别
+
+## Advanced settings (English)
+
+Open **Advanced settings** below Model management in the sidebar. These are global settings
+and are stored separately from credentials, in `app-settings.json` under the app's user-data folder.
+
+| Setting | Default | Range and behavior |
+| --- | --- | --- |
+| Minimum recording duration | 5 seconds | Integer 1–100; shorter recordings are discarded on stop with a notice, not applied retroactively |
+| Maximum audio size | 100 MB | Integer 10–1000; checked before reading each file; oversized audio is preserved and its path shown for compression/splitting |
+| Recording shortcut | Option + Shift + R | Modifiers plus a letter/digit; both common-shortcut denylist and system registration must pass before saving |
+| Recording retention | 30 days | Integer 1–3650; expired sessions and internal analysis/build results move to Trash; external exports are unaffected |
+
+MB uses 1024 × 1024 bytes. Raising the audio limit can increase peak decoding memory.
+Settings cannot change while recording or while a recording starts/stops. Shortcut capture
+temporarily releases the current binding and restores it on blur or window close. A successful
+system registration cannot detect every third-party app's internal shortcut.
+
+Retention runs at startup and hourly, deferring while the library is open or recording/model
+tasks are active. Transcription, post-processing and unfinished sessions are skipped. Trash
+failures preserve the files rather than permanently deleting them. Restore from Trash and
+extend retention if necessary; export important material before expiry.
+
+Legacy forbidden shortcuts fall back to the default without resetting other valid settings.
+Saved custom values are preserved on update; missing retention values default to 30 days.

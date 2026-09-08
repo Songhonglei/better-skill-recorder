@@ -3,7 +3,11 @@
 [中文安装与使用说明](docs/GETTING_STARTED.zh-CN.md) · [Project website](https://songhonglei.github.io/better-skill-recorder/)
 
 The current preview supports **Apple Silicon Macs only**. It does not provide Windows,
-Linux, or Intel Mac packages.
+Linux, or Intel Mac packages yet.
+
+Prefer help from an agent? Copy the [English or Chinese installation prompt](docs/AGENT_INSTALL.md).
+It pins the release download and checksum, preserves existing data and leaves security
+permissions and credentials under your control.
 
 ## Unsigned preview warning
 
@@ -68,6 +72,19 @@ connection, then save and enable it.
 The API key is encrypted using Electron `safeStorage`, backed by the macOS login keychain.
 The JSON configuration contains model metadata and may reference an environment-variable
 name, but should not contain the plaintext API key.
+
+## Record, review and export
+
+Press **Option + Shift + R** or click the record button. Narration is optional. Start with
+a non-sensitive 20–30 second example, finish recording, then open Recordings to analyze,
+review the result and export a Skill. Choose share-safe for sharing and inspect the output.
+Scheduled Skills require a capable host agent; this app does not host scheduled execution.
+
+Advanced settings default to a 5-second minimum recording, a 100 MB audio limit and
+30-day retention. Short recordings are discarded with a notice. Oversized audio is not
+read and its path is shown for compression/splitting. Expired sessions go to Trash during
+idle cleanup; external exports are unaffected. Existing custom settings survive updates.
+See [advanced settings](docs/ADVANCED_SETTINGS.md) and the [current UI gallery](docs/SCREENSHOTS.md).
 
 ## Update
 

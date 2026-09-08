@@ -6,7 +6,7 @@ analysis can be enabled for models that support inline image input.
 
 ## UI configuration
 
-Open **Sessions → Model control**. The page can:
+Open **Recordings → Model management** in the sidebar. The page can:
 
 - select a preset or enter a custom model ID;
 - set the BaseURL and API key;
@@ -15,6 +15,15 @@ Open **Sessions → Model control**. The page can:
 - make a real endpoint + authentication + function-calling test (plus inline image
   transport when Visual analysis is enabled); and
 - save and activate the provider without restarting the app.
+
+The model dropdown is labeled **Choose model**. Enable **Custom model** beside it to
+enter an ID containing only ASCII letters, digits, `-`, `_`, `.`, or `/`.
+BaseURL and API key each have a full-width row. Qwen's **Token Plan** checkbox sits in
+the BaseURL heading: checked selects the preset's subscription endpoint; unchecked
+selects its standard API endpoint. Other configuration contains visual analysis, viewing
+the configuration file and reloading it; Test connection and Save and enable are in the footer.
+
+[Current model-management screenshot](SCREENSHOTS.md#model-management--模型管理)
 
 Changing providers clears idle model conversations so feedback from one provider is
 never resumed against another provider. A setting change is rejected while an Analyze
@@ -70,6 +79,8 @@ model ID that is not in the list.
 Each preset accepts:
 
 - `id` and `label`: required model ID and display name;
+- `baseUrl`: the preset's normal API endpoint;
+- `tokenPlanBaseUrl`: optional subscription endpoint used by the Token Plan checkbox;
 - `badge` and `source`: optional presentation metadata;
 - `verified`: whether the model passed this project's compatibility protocol; and
 - `capabilities`: optional tags. Selecting a preset tagged `vision` enables Visual analysis.

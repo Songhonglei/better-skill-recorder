@@ -224,7 +224,7 @@ the web hosts are forbidden: `cowork-teams-digest` (read a channel then post via
 ## Sensitive detection + redaction evals (`evals/sensitive/`)
 
 Guards the **on-device sanitization pipeline** that runs before anything is sent to
-GitHub Copilot on Analyze: the two detection layers (secretlint secrets · our
+the configured model on Analyze: the two detection layers (secretlint secrets · our
 in-repo structured-PII regex) and the two redaction seams (masking outgoing
 **text** channels, and OCR + blur of on-screen values in **frames** under Advanced
 protection).

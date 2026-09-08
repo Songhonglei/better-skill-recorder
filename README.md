@@ -1,5 +1,7 @@
 # Better Skill Recorder
 
+[English](README.md) · [简体中文](README.zh-CN.md)
+
 **Preview V0.1.0 · Apple Silicon · Unsigned Preview**
 
 [项目主页 / Website](https://songhonglei.github.io/better-skill-recorder/) ·
@@ -7,12 +9,15 @@
 [中文安装与使用说明](docs/GETTING_STARTED.zh-CN.md) ·
 [高级设置](docs/ADVANCED_SETTINGS.md)
 
+[Install with an agent](docs/AGENT_INSTALL.md) — copy a prompt for verified download,
+checksum validation and installation, with user-controlled permissions
+
 No Node.js, npm, or GitHub Copilot installation is required for packaged-app users.
 Bring your own compatible model endpoint and API key. This preview has not yet completed
 an independent clean-Mac acceptance test; begin with non-sensitive sample recordings.
 
-Record a task once and turn it into an on-demand Skill or an automated workflow that an
-AI agent can reuse.
+Record your screen, talk through the task, and let AI turn it into a reusable Skill.
+Review the generated steps and export a share-safe or personal package for your agent.
 
 Better Skill Recorder captures screen activity, app and window changes, browser context,
 clipboard previews, and optional narration. A user-selected OpenAI-compatible model then
@@ -20,13 +25,17 @@ reconstructs the intent and ordered steps. You can review the result before expo
 as a share-safe Skill or a personal Skill containing local configuration.
 
 > Current platform: **macOS on Apple Silicon (ARM64)**. Windows, Linux, and Intel Mac
-> packages are not part of the current release.
+> installers are not yet supported.
 
 <p align="center">
   <img src="docs/images/recorder.png" alt="Better Skill Recorder capture window" width="420">
   &nbsp;&nbsp;
   <img src="docs/images/library.png" alt="Better Skill Recorder sessions window" width="520">
 </p>
+
+Current Preview V0.1.0 renderer, captured with synthetic demo settings and an empty
+recording library. No personal recordings or API keys are included. See the
+[interface gallery](docs/SCREENSHOTS.md) for model management and advanced settings.
 
 ## Highlights
 
@@ -35,6 +44,8 @@ as a share-safe Skill or a personal Skill containing local configuration.
 - Configure verified presets or any compatible model ID
 - Keep API keys encrypted by the macOS credential store
 - Run English OCR locally before visual data is sent to the selected model
+- Automatically move expired recordings to Trash (30 days by default, configurable)
+- Configure the minimum recording duration, audio size limit and global shortcut
 - Export share-safe Skills without secrets or machine-specific configuration
 - Export personal Skills that retain local defaults when explicitly requested
 - Generate Skills without coupling them to OpenClaw, Codex, Claude Code, or another host
@@ -156,3 +167,5 @@ or third-party assets without redistribution permission.
 The project is available under the [MIT License](LICENSE). It is based on Microsoft's
 original Skill Recorder project and includes substantial independent modifications.
 Microsoft does not sponsor or support this fork.
+
+Upstream: [microsoft/skill-recorder](https://github.com/microsoft/skill-recorder)

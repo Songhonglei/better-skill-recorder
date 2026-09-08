@@ -4,7 +4,7 @@
 > Better Skill Recorder release. This file is retained only as historical engineering context.
 
 Skill Recorder supports native Windows 11 builds for both x64 and ARM64. The
-architecture gate lives in [`.github/workflows/windows.yml`](.github/workflows/windows.yml)
+architecture gate lived in [the archived Windows workflow](https://github.com/Songhonglei/better-skill-recorder/blob/cef4b35/.github/workflows/windows.yml)
 and runs on GitHub's `windows-latest` and native `windows-11-arm` images.
 
 ## Architecture-sensitive components
