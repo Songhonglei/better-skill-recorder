@@ -3,6 +3,8 @@ import { content, installationPrompt, release } from '../website/content.mjs';
 
 const escape = s => String(s).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 const repo = release.repo;
+// 站点基址可由构建环境覆盖；默认值保持 GitHub Pages 地址，换域名只需设 SITE_BASE_URL 重建。
+const siteBase = (process.env.SITE_BASE_URL || 'https://songhonglei.github.io/better-skill-recorder').replace(/\/$/, '');
 const asset = name => `${repo}/releases/download/${release.tag}/${name}`;
 const mark = '<span class="pulse small" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></span>';
 for (const [locale, c] of Object.entries(content)) {
@@ -13,8 +15,8 @@ for (const [locale, c] of Object.entries(content)) {
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="${escape(c.description)}"><meta name="theme-color" content="#112b29">
   <title>${c.title}</title>
-  <link rel="alternate" hreflang="zh-CN" href="https://songhonglei.github.io/better-skill-recorder/">
-  <link rel="alternate" hreflang="en" href="https://songhonglei.github.io/better-skill-recorder/en.html">
+  <link rel="alternate" hreflang="zh-CN" href="${siteBase}/">
+  <link rel="alternate" hreflang="en" href="${siteBase}/en.html">
   <link rel="stylesheet" href="style.css"><script src="site.js" defer></script>
 </head>
 <body>
